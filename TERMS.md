@@ -38,4 +38,4 @@ Podemos actualizar estos términos; si sigues usando la app tras los cambios, lo
 Estos términos se rigen por la ley española.
 
 ## 11. Contacto
-Correo: **[PON AQUÍ TU CORREO DE CONTACTO]**
+Correo: **pulguito0103@gmail.com**
