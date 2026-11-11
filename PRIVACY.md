@@ -56,4 +56,4 @@ Si cambiamos esta política, actualizaremos la fecha de arriba.
 
 ## 11. Contacto
 Responsable: FurryMichis
-Correo: **[PON AQUÍ TU CORREO DE CONTACTO]**
+Correo: **pulguito0103@gmail.com**
