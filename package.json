@@ -1,0 +1,120 @@
+{
+  "name": "notxunta-client",
+  "version": "0.6.0",
+  "description": "Cliente de escritorio para el Aula Virtual (Moodle) de la Xunta de Galicia · Windows, Linux y macOS",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron .",
+    "dist": "electron-builder --win --x64 --publish never",
+    "dist:win": "electron-builder --win --x64 --publish never",
+    "dist:mac": "electron-builder --mac --publish never",
+    "dist:linux": "electron-builder --linux --publish never",
+    "release": "electron-builder --win --x64 --publish always",
+    "release:mac": "electron-builder --mac --publish always",
+    "release:linux": "electron-builder --linux --publish always"
+  },
+  "devDependencies": {
+    "electron": "^35.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "author": {
+    "name": "FurryMichis",
+    "email": "noreply@users.noreply.github.com"
+  },
+  "build": {
+    "appId": "com.notxunta.client",
+    "productName": "NotXunta Client",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "build/icon.png",
+      "package.json"
+    ],
+    "win": {
+      "icon": "build/icon.png",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "NotXunta Client",
+      "artifactName": "NotXuntaClient-Setup.${ext}"
+    },
+    "portable": {
+      "artifactName": "NotXuntaClient-Portable.${ext}"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "FurryMichis",
+        "repo": "notxunta-client"
+      }
+    ],
+    "mac": {
+      "icon": "build/icon.png",
+      "category": "public.app-category.education",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "artifactName": "NotXuntaClient-Mac-${arch}.${ext}"
+    },
+    "dmg": {
+      "title": "NotXunta Client"
+    },
+    "linux": {
+      "icon": "build/icon.png",
+      "category": "Education",
+      "maintainer": "FurryMichis <noreply@users.noreply.github.com>",
+      "synopsis": "Cliente del Aula Virtual de la Xunta",
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "NotXuntaClient-Linux-${arch}.${ext}"
+    }
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.9"
+  },
+  "homepage": "https://github.com/FurryMichis/notxunta-client"
+}
