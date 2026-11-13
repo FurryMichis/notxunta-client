@@ -1,0 +1,16 @@
+html,body{margin:0;height:100%;background:transparent;overflow:hidden;font-family:Inter,Segoe UI,sans-serif;user-select:none;-webkit-app-region:drag}
+.card{position:absolute;inset:8px;border-radius:16px;background:radial-gradient(ellipse at 50% 0%,#3a2a5c66,transparent 60%),linear-gradient(160deg,#211c30,#13101c);
+  border:1px solid #3f3558;box-shadow:0 14px 44px #000b;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#f4f0ff;padding:0 28px}
+.logo{width:74px;height:74px;border-radius:18px;object-fit:cover;box-shadow:0 6px 30px #8a5de966;animation:pulse 2.4s ease-in-out infinite}
+h1{margin:6px 0 0;font-size:16px;font-weight:800;letter-spacing:2px}
+h1 span{font-weight:400;color:#a69bbd;margin-left:6px}
+#status{margin:0;font-size:12.5px;color:#d6cde8;min-height:17px;text-align:center}
+.bar{width:210px;height:4px;border-radius:4px;background:#2c2540;overflow:hidden;position:relative;margin-top:2px}
+.bar i{position:absolute;top:0;bottom:0;left:0;width:40%;border-radius:4px;background:linear-gradient(90deg,#a47af7,#7950d1);animation:slide 1.2s ease-in-out infinite}
+.bar.det i{animation:none;width:0;transition:width .25s}
+#skip{-webkit-app-region:no-drag;margin-top:4px;border:1px solid #443a59;background:#302a3e;color:#e7dfff;border-radius:8px;padding:6px 12px;font:600 11px Inter,Segoe UI,sans-serif;cursor:pointer}
+#skip:hover{filter:brightness(1.15)}
+small{position:absolute;bottom:10px;font-size:9.5px;letter-spacing:1px;color:#6f6783}
+@keyframes slide{0%{left:-40%}100%{left:100%}}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+@media (prefers-reduced-motion:reduce){.logo{animation:none}}

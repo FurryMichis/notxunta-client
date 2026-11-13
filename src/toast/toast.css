@@ -1,0 +1,13 @@
+html,body{margin:0;height:100%;background:transparent;overflow:hidden;font-family:Inter,Segoe UI,sans-serif;user-select:none}
+.toast{position:absolute;inset:6px;display:flex;align-items:center;gap:14px;padding:0 14px 0 16px;border-radius:12px;
+  background:linear-gradient(135deg,#241f33,#171321);border:1px solid #4a3f61;border-left:4px solid var(--accent,#9b72f2);
+  box-shadow:0 10px 34px #000b;color:#f4f0ff;cursor:pointer;transform:translateX(120%);opacity:0;transition:transform .35s cubic-bezier(.2,.9,.3,1),opacity .35s}
+.toast.in{transform:none;opacity:1}
+.toast.out{transform:translateX(120%);opacity:0}
+.ico{width:48px;height:48px;border-radius:12px;flex:none;display:grid;place-items:center;font-size:26px;background:#392850 center/cover no-repeat}
+.txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.txt b{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.txt span{font-size:12px;color:#d6cde8;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.txt small{font-size:10px;color:#9b94ac;letter-spacing:.3px}
+.x{border:0;background:transparent;color:#9b94ac;font-size:20px;cursor:pointer;align-self:flex-start;margin-top:8px;padding:0 4px}
+.x:hover{color:#fff}

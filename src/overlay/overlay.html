@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self';">
+  <title>NotXunta Overlay</title>
+  <link rel="stylesheet" href="overlay.css">
+</head>
+<body>
+  <div id="backdrop">
+    <section id="panel" aria-label="Overlay de NotXunta Client">
+      <div id="tabs" role="tablist" aria-label="Pestañas"></div>
+      <header class="bar">
+        <div class="brand"><img src="../assets/logo.png" alt=""><span>NOTXUNTA<i>OVERLAY</i></span></div>
+        <div class="navbtns">
+          <button id="b-back" title="Atrás" disabled>◀</button>
+          <button id="b-fwd" title="Adelante" disabled>▶</button>
+          <button id="b-reload" title="Recargar" disabled>⟳</button>
+          <button id="b-home" title="Inicio del overlay">⌂</button>
+        </div>
+        <form id="omni" autocomplete="off">
+          <input id="q" type="text" spellcheck="false" placeholder="Busca en Google o escribe una dirección…">
+        </form>
+        <button id="b-ext" title="Abrir esta página en tu navegador" disabled>↗</button>
+        <button id="b-close" title="Cerrar (Shift+Tab)">×</button>
+      </header>
+      <div class="quick" id="quick"></div>
+      <div id="slot">
+        <div id="home"></div>
+        <div id="err" hidden></div>
+        <div id="loadbar" hidden></div>
+      </div>
+      <footer><span id="hint"></span></footer>
+    </section>
+  </div>
+  <script src="overlay.js"></script>
+</body>
+</html>

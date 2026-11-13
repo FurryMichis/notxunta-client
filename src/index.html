@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; img-src 'self' data:; media-src nx-media:; style-src 'self'; script-src 'self';">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NotXunta Client</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="instance.css">
+</head>
+<body>
+  <div id="bg-layer" data-bg="none"><div id="bg-art"></div><video id="bg-video" loop playsinline preload="auto"></video><canvas id="bg-canvas"></canvas><div id="bg-dim"></div></div>
+  <!-- ============ LANZADOR (cuentas) ============ -->
+  <div class="app-shell" id="launcher-shell">
+    <aside class="sidebar">
+      <div class="brand"><img class="brand-mark" src="assets/logo.png" alt=""><span>NOTXUNTA<span class="brand-light">CLIENT</span></span></div>
+      <div class="side-label">WORKSPACE</div>
+      <button class="nav active" data-view="accounts"><span>▦</span> Gestor de cuentas</button>
+      <button class="nav" data-view="instances"><span>◈</span> Instancias</button>
+      <button class="nav" data-view="cloud"><span>☁</span> Cuenta y amigos<em class="nav-badge" data-badge="friends" hidden></em></button>
+      <button class="nav" data-view="news"><span>✧</span> Novedades<em class="nav-badge" data-badge="news" hidden>NUEVO</em></button>
+      <button class="nav" data-view="appearance"><span>✦</span> Apariencia</button>
+      <button class="nav" data-view="settings"><span>⚙</span> Ajustes</button>
+      <div class="sidebar-bottom">
+        <button class="nav" id="open-overlay"><span>❖</span> Abrir overlay <small class="kbd">Shift+Tab</small></button>
+        <div class="version">NOTXUNTA CLIENT <span>v0.6.0</span></div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="breadcrumb">NOTXUNTA CLIENT <span>/</span> <b id="crumb">GESTOR DE CUENTAS</b></div>
+        <div class="top-actions"><div class="sound-ctl" hidden></div><div class="zoom-ctl"></div><span class="status-dot"></span><span>Cliente local</span><div class="avatar" id="launcher-avatar">AC</div></div>
+      </header>
+
+      <section class="view active" id="accounts-view">
+        <div class="hero">
+          <div>
+            <div class="eyebrow">TU ESPACIO DE ESTUDIO</div>
+            <h1>Bienvenido de nuevo.</h1>
+            <p>Administra tus cuentas y entra a tus aulas virtuales desde un solo lugar.</p>
+          </div>
+          <figure class="hero-cat"><img src="assets/cat.jpg" alt="Gato galaxia"><figcaption>creado por FurryMichis</figcaption></figure>
+        </div>
+        <div class="section-heading">
+          <div><h2>Tus cuentas</h2><p>Elige una cuenta o añade una nueva instancia.</p></div>
+          <button class="primary" id="add-account">＋ Añadir cuenta</button>
+        </div>
+        <div class="account-grid" id="account-grid"></div>
+        <div class="security-note"><span>◇</span><div><b>Tu privacidad importa</b><p>La contraseña se guarda cifrada con el almacén seguro de tu sistema (Windows, Mac o Linux) y solo se envía al aula que indicas.</p></div></div>
+      </section>
+
+      <section class="view" id="instances-view">
+        <div class="page-title"><div class="eyebrow">CONFIGURACIÓN</div><h1>Instancias</h1><p>Gestiona las direcciones de tus aulas virtuales.</p></div>
+        <div id="instance-list"></div>
+      </section>
+
+      <section class="view" id="cloud-view"></section>
+      <section class="view" id="news-view"></section>
+      <section class="view" id="appearance-view"></section>
+      <section class="view" id="settings-view"></section>
+    </main>
+  </div>
+
+  <!-- ============ INSTANCIA (aula virtual) ============ -->
+  <div class="app-shell" id="instance-shell" hidden>
+    <aside class="sidebar">
+      <div class="brand"><img class="brand-mark" src="assets/logo.png" alt=""><span>NOTXUNTA<span class="brand-light">CLIENT</span></span></div>
+      <div class="inst-head"><span class="moodle-icon sm" id="inst-icon">M</span><div class="side-label" id="inst-name">AULA</div></div>
+      <button class="nav active" data-iview="courses"><span>▦</span> Mis cursos</button>
+      <button class="nav" data-iview="calendar"><span>◷</span> Calendario</button>
+      <button class="nav" data-iview="tasks"><span>✎</span> Tareas</button>
+      <button class="nav" data-iview="grades"><span>★</span> Calificaciones</button>
+      <button class="nav" data-iview="messages"><span>✉</span> Mensajes<em class="nav-badge" id="badge-messages" hidden></em></button>
+      <button class="nav" data-iview="notifications"><span>⚑</span> Notificaciones</button>
+      <button class="nav" data-iview="friends"><span>♥</span> Amigos<em class="nav-badge" data-badge="friends" hidden></em></button>
+      <button class="nav" data-iview="profile"><span>☺</span> Perfil</button>
+      <button class="nav" data-iview="appearance"><span>✦</span> Apariencia</button>
+      <button class="nav" data-iview="settings"><span>⚙</span> Ajustes</button>
+      <div class="sidebar-bottom">
+        <button class="nav" id="open-overlay-2"><span>❖</span> Abrir overlay <small class="kbd">Shift+Tab</small></button>
+        <button class="nav" id="back-launcher"><span>←</span> Cambiar de cuenta</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="breadcrumb"><span id="inst-crumb-name">AULA</span> <span>/</span> <b id="inst-crumb">MIS CURSOS</b></div>
+        <div class="top-actions">
+          <div class="sound-ctl" hidden></div>
+          <div class="zoom-ctl"></div>
+          <span id="sync-status"></span>
+          <button class="secondary small" id="sync-btn">⟳ Sincronizar</button>
+          <div class="avatar" id="inst-avatar">··</div>
+        </div>
+      </header>
+      <div class="offline-banner" id="offline-banner" hidden></div>
+      <section class="view active" id="iv-courses"></section>
+      <section class="view" id="iv-calendar"></section>
+      <section class="view" id="iv-tasks"></section>
+      <section class="view" id="iv-grades"></section>
+      <section class="view" id="iv-messages"></section>
+      <section class="view" id="iv-notifications"></section>
+      <section class="view" id="iv-friends"></section>
+      <section class="view" id="iv-profile"></section>
+      <section class="view" id="iv-appearance"></section>
+      <section class="view" id="iv-settings"></section>
+    </main>
+  </div>
+
+  <div class="loading-overlay" id="loading" hidden>
+    <div class="spinner"></div><div id="loading-text">Conectando…</div>
+  </div>
+
+  <dialog id="account-dialog">
+    <form method="dialog" id="account-form">
+      <div class="dialog-head"><div><div class="eyebrow">NUEVA CONEXIÓN</div><h2>Añadir cuenta</h2></div><button class="close" type="button" aria-label="Cerrar">×</button></div>
+      <label>Nombre de la instancia<input id="instance-name" placeholder="Ej. Aula del instituto" required></label>
+      <label>Enlace del Aula Virtual<input id="instance-url" type="url" placeholder="https://centros.edu.xunta.gal/tu-centro/aulavirtual" required></label>
+      <label>Nombre de usuario<input id="instance-user" autocomplete="username" placeholder="Tu usuario del aula" required></label>
+      <label>Contraseña<input id="instance-password" type="password" autocomplete="current-password" placeholder="Tu contraseña" required></label>
+      <div class="form-hint">Se comprobará la conexión y la contraseña se guardará cifrada con el almacén seguro de tu sistema. Solo se envía al aula indicada.</div>
+      <div class="form-error" id="account-error" hidden></div>
+      <div class="dialog-actions"><button class="secondary" id="cancel-account" type="button">Cancelar</button><button class="primary" id="save-account" type="submit">Conectar y guardar</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="pw-dialog">
+    <form method="dialog" id="pw-form">
+      <div class="dialog-head"><div><div class="eyebrow">AULA IMPORTADA DE TU CUENTA NOTXUNTA</div><h2 id="pw-title">Contraseña del aula</h2></div><button class="close" type="button" id="pw-close" aria-label="Cerrar">×</button></div>
+      <p class="muted dlg-text" id="pw-text"></p>
+      <label>Contraseña<input id="pw-input" type="password" autocomplete="current-password" placeholder="Tu contraseña del aula" required></label>
+      <div class="form-hint">Las contraseñas nunca se sincronizan: se piden una vez en cada ordenador y se guardan cifradas con el almacén seguro de tu sistema.</div>
+      <div class="form-error" id="pw-error" hidden></div>
+      <div class="dialog-actions"><button class="secondary" id="pw-cancel" type="button">Cancelar</button><button class="primary" id="pw-save" type="submit">Conectar y guardar</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="msg-dialog">
+    <form method="dialog" id="msg-form">
+      <div class="dialog-head"><div><div class="eyebrow">ENVIAR MENSAJE</div><h2 id="msg-title">Mensaje</h2></div><button class="close" type="button" id="msg-close" aria-label="Cerrar">×</button></div>
+      <label>Mensaje<textarea id="msg-text" rows="6" placeholder="Escribe tu mensaje…" required></textarea></label>
+      <div class="form-error" id="msg-error" hidden></div>
+      <div class="dialog-actions"><button class="secondary" id="msg-cancel" type="button">Cancelar</button><button class="primary" id="msg-send" type="submit">Enviar</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="icon-dialog">
+    <form method="dialog" id="icon-form">
+      <div class="dialog-head"><div><div class="eyebrow">PERSONALIZAR</div><h2 id="icon-title">Icono de la instancia</h2></div><button class="close" type="button" id="icon-close" aria-label="Cerrar">×</button></div>
+      <div class="icon-preview"><div class="moodle-icon lg" id="icon-preview">M</div><div class="muted">Elige un emoji o sube tu propia imagen.</div></div>
+      <div class="emoji-grid" id="emoji-grid"></div>
+      <div class="dialog-actions icon-actions">
+        <button class="secondary" type="button" id="icon-remove">Quitar icono</button>
+        <button class="secondary" type="button" id="icon-upload">Subir imagen…</button>
+        <button class="primary" type="button" id="icon-save">Guardar</button>
+      </div>
+      <input type="file" id="icon-file" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+    </form>
+  </dialog>
+
+  <dialog id="ai-dialog">
+    <form method="dialog" id="ai-form">
+      <div class="dialog-head"><div><div class="eyebrow">PRIMER INICIO</div><h2>Elige tu IA</h2></div><button class="close" type="button" id="ai-close" aria-label="Cerrar">×</button></div>
+      <p class="muted dlg-text">Se abrirá desde el botón de IA del overlay (Shift+Tab). Puedes cambiarla cuando quieras en Ajustes.</p>
+      <div class="ai-grid" id="ai-grid"></div>
+      <div class="dialog-actions"><button class="secondary" type="button" id="ai-skip">Ahora no</button></div>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast"></div>
+  <script src="renderer.js"></script>
+</body>
+</html>
