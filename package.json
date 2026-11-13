@@ -64,7 +64,8 @@
       {
         "provider": "github",
         "owner": "FurryMichis",
-        "repo": "notxunta-client"
+        "repo": "notxunta-client",
+        "releaseType": "release"
       }
     ],
     "mac": {
