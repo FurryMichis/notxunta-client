@@ -141,6 +141,7 @@ $$(".nav[data-view]").forEach(btn => btn.addEventListener("click", () => {
   const label = btn.cloneNode(true); label.querySelector(".nav-badge")?.remove();
   crumb.textContent = label.textContent.trim().replace(/^\S+\s+/, "").toUpperCase();
   if (btn.dataset.view === "cloud") renderCloud($("#cloud-view")).catch(e => notify(e.message));
+  if (btn.dataset.view === "nxfiles") renderNxFiles($("#nxfiles-view")).catch(e => notify(e.message));
   if (btn.dataset.view === "news") renderNews($("#news-view")).catch(e => notify(e.message));
   if (btn.dataset.view === "appearance") renderAppearance($("#appearance-view"));
   if (btn.dataset.view === "settings") renderSettings($("#settings-view")).catch(e => notify(e.message));
@@ -401,6 +402,13 @@ function renderAppearance(root) {
   clear(root);
   root.append(pageTitle("PERSONALIZACIÓN", "Apariencia", "Elige un fondo (imagen, GIF o vídeo), el tamaño de la interfaz y el color principal de NotXunta Client."));
 
+  const onlineCb = h("input", { type: "checkbox" }); onlineCb.checked = p.show_online !== false;
+  onlineCb.addEventListener("change", async () => {
+    onlineCb.disabled = true;
+    try { await api("cloudUpdateProfile", { show_online: onlineCb.checked }); notify(onlineCb.checked ? "Tus amigos ya ven cuándo estás en línea." : "Tu estado en línea ya no es visible."); }
+    catch (e) { onlineCb.checked = !onlineCb.checked; notify(e.message); }
+    onlineCb.disabled = false;
+  });
   const fileInput = h("input", { type: "file", accept: "image/*", hidden: "" });
   fileInput.addEventListener("change", async () => {
     const f = fileInput.files[0]; fileInput.value = "";
@@ -602,6 +610,7 @@ const IVIEWS = {
   grades: ["CALIFICACIONES", renderGrades],
   messages: ["MENSAJES", renderMessages],
   notifications: ["NOTIFICACIONES", renderNotifications],
+  files: ["ARCHIVOS", renderFiles],
   friends: ["AMIGOS", renderCloud],
   profile: ["PERFIL", renderProfile],
   appearance: ["APARIENCIA", renderAppearance],
@@ -813,7 +822,7 @@ async function renderParticipants(root, c) {
           catch (err) { notify(err.message); }
           await reload();
         } }));
-      } else if (rel.status === "accepted") act.append(chip("✓ AMIGOS", "ok"));
+      } else if (rel.status === "accepted") act.append(presenceBit(rel), chip("✓ AMIGOS", "ok"));
       else if (rel.i_requested) act.append(chip("SOLICITUD ENVIADA", "warn"));
       else act.append(h("button", { class: "primary small", text: "Aceptar solicitud", onclick: async e => {
         e.currentTarget.disabled = true;
@@ -864,8 +873,8 @@ async function renderCloud(root) {
   const panel = await friendsPanel(redo);
   if (stale()) return;
   root.append(card);
-  if (st.schemaOutdated) root.append(h("div", { class: "cloud-card" }, h("h2", { text: "Falta actualizar el servidor" }),
-    h("p", { text: "Tu cuenta funciona, pero la foto de perfil y la sincronización de ajustes necesitan una actualización de la base de datos de Supabase: abre el SQL Editor, pega el contenido de supabase/migration-0.5.6.sql y pulsa Run. No hace falta reinstalar la app." })));
+  if (st.schemaOutdated || st.presenceOutdated) root.append(h("div", { class: "cloud-card" }, h("h2", { text: "Falta actualizar el servidor" }),
+    h("p", { text: `Tu cuenta funciona, pero ${st.schemaOutdated ? "la foto de perfil, la sincronización de ajustes, " : ""}el estado «en línea» y los Archivos NotXunta necesitan una actualización de la base de datos de Supabase: abre el SQL Editor, pega el contenido de supabase/migration-0.6.1.sql${st.schemaOutdated ? " (y antes el de migration-0.5.6.sql)" : ""} y pulsa Run. No hace falta reinstalar la app.` })));
   root.append(panel);
 }
 
@@ -1015,6 +1024,8 @@ function accountCard(redo, st) {
       h("small", { text: "Tu fondo (imagen), color, ajustes de la app y tus aulas (nombre, enlace y usuario; nunca contraseñas) se guardan en tu cuenta y se importan al iniciar sesión en otro ordenador." }), syncMsg), syncBtn),
     h("label", { class: "switch-row" }, h("span", {}, h("b", { text: "Que mis compañeros de aula me encuentren" }),
       h("small", { text: "Si lo desactivas, no apareces en «Participantes» y se borran tus vínculos con las aulas." })), cb),
+    !st.presenceOutdated && h("label", { class: "switch-row" }, h("span", {}, h("b", { text: "Mostrar cuando estoy en línea" }),
+      h("small", { text: "Tus amigos (solo ellos) ven un punto verde mientras NotXunta Client está abierto en tu ordenador, o cuándo te conectaste por última vez. Si lo desactivas, nadie ve tu estado." })), onlineCb),
     h("div", { class: "cloud-actions" },
       h("button", { class: "secondary", text: "Cerrar sesión", onclick: async () => { try { await api("cloudSignOut"); redo(); } catch (e) { notify(e.message); } } }),
       h("button", { class: "secondary danger", text: "Eliminar mi cuenta", onclick: async () => {
@@ -1029,16 +1040,18 @@ async function friendsPanel(redo) {
   try { rows = await api("friendsList"); } catch (e) { wrap.append(empty("!", "No se pudieron cargar tus amigos", e.message)); return wrap; }
   const incoming = rows.filter(r => r.status === "pending" && !r.i_requested);
   const sent = rows.filter(r => r.status === "pending" && r.i_requested);
-  const friends = rows.filter(r => r.status === "accepted");
+  const friends = rows.filter(r => r.status === "accepted").sort((a, b) => Number(!!b.online) - Number(!!a.online));
+  const onlineN = friends.filter(r => r.online).length;
   setFriendBadge(incoming.length);
 
   const person = (r, ...acts) => h("div", { class: "friend-row" }, cloudPic(r, "sm"),
-    h("span", { class: "item-main" }, h("b", { text: r.display_name || r.username }), h("span", { class: "muted", text: `@${r.username}` })), h("div", { class: "acts" }, ...acts));
+    h("span", { class: "item-main" }, h("b", { text: r.display_name || r.username }),
+      h("span", { class: "muted" }, `@${r.username}`, r.status === "accepted" && presenceBit(r))), h("div", { class: "acts" }, ...acts));
   const act = (text, cls, fn) => h("button", { class: `${cls} small`, text, onclick: async e => {
     e.currentTarget.disabled = true;
     try { await fn(); redo(); } catch (er) { notify(er.message); e.currentTarget.disabled = false; }
   } });
-  const section = (title, list, build) => list.length > 0 && h("div", { class: "cloud-section" }, h("h3", { text: `${title} (${list.length})` }),
+  const section = (title, list, build, extra) => list.length > 0 && h("div", { class: "cloud-section" }, h("h3", { text: `${title} (${list.length})${extra ? " · " + extra : ""}` }),
     h("div", { class: "item-list" }, list.map(build)));
 
   // Añadir por nombre de usuario
@@ -1070,9 +1083,15 @@ async function friendsPanel(redo) {
     section("TUS AMIGOS", friends, r => person(r, act("Eliminar", "secondary", async () => {
       if (!confirm(`¿Dejar de ser amigo de @${r.username}?`)) throw new Error("Cancelado.");
       await api("friendRemove", r.friendship_id);
-    }))),
+    })), onlineN ? `${onlineN} en línea` : ""),
     section("SOLICITUDES ENVIADAS", sent, r => person(r, act("Cancelar", "secondary", () => api("friendRemove", r.friendship_id))))
   ].filter(Boolean));
+  // El estado «en línea» se refresca solo mientras esta pantalla siga abierta (sin volver a pintarla entera).
+  const presenceTimer = setInterval(async () => {
+    if (!wrap.isConnected) { clearInterval(presenceTimer); return; }
+    try { for (const r of (await api("friendsList")).filter(x => x.status === "accepted")) $$(`[data-uid="${r.other_id}"]`, wrap).forEach(el => paintPresence(el, r)); }
+    catch { /* sin conexión: se queda como estaba */ }
+  }, 30000);
   if (!rows.length) wrap.append(empty("♥", "Todavía no tienes amigos", "Añade a alguien por su usuario o desde la pestaña «Participantes» de tus cursos."));
   return wrap;
 }
@@ -1486,3 +1505,176 @@ api("changelog").then(c => setNewsBadge(c.seen !== c.current)).catch(() => {});
 // ------------------------------------------------------------------ arranque
 renderAccounts();
 maybeAskAi();
+
+
+// ------------------------------------------------------------------ estado «en línea»
+function agoText(iso) {
+  const min = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+  if (min < 2) return "hace un momento";
+  if (min < 60) return `hace ${min} min`;
+  if (min < 1440) return `hace ${Math.round(min / 60)} h`;
+  return `hace ${Math.round(min / 1440)} d`;
+}
+function paintPresence(el, r) {
+  const on = !!r.online;
+  el.classList.toggle("on", on);
+  el.title = on ? "En línea" : r.last_seen ? `Visto ${agoText(r.last_seen)}` : "Desconectado";
+  el.lastChild.textContent = on ? "En línea" : r.last_seen ? `Visto ${agoText(r.last_seen)}` : "Desconectado";
+}
+function presenceBit(r) {
+  const el = h("span", { class: "presence-bit", "data-uid": r.other_id }, h("i", { class: "presence-dot" }), h("span", {}));
+  paintPresence(el, r);
+  return el;
+}
+
+// ------------------------------------------------------------------ archivos
+const fileExt = name => { const m = /\.([A-Za-z0-9]{1,5})$/.exec(name || ""); return m ? m[1].toUpperCase() : "···"; };
+const fmtBytes = n => n < 1024 ? `${n} B` : n < 1048576 ? `${Math.max(1, Math.round(n / 1024))} KB` : n < 1073741824 ? `${(n / 1048576).toFixed(n < 10485760 ? 1 : 0)} MB` : `${(n / 1073741824).toFixed(1)} GB`;
+
+// Barra de espacio usado. quota = 0 → el servidor no indica límite.
+function quotaBar(used, quota, label) {
+  const pct = quota ? Math.min(100, Math.round(used / quota * 100)) : 0;
+  const bar = h("div", { class: `quota-bar${pct >= 90 ? " full" : ""}` }, h("i", { style: `width:${pct}%` }));
+  return h("div", { class: "quota" },
+    h("div", { class: "quota-text" }, h("b", { text: quota ? `${fmtBytes(used)} de ${fmtBytes(quota)}` : `${fmtBytes(used)} usados` }),
+      h("span", { class: "muted", text: quota ? `${label} · ${pct} % ocupado · quedan ${fmtBytes(Math.max(0, quota - used))}` : `${label} · el servidor no indica un límite` })),
+    quota ? bar : null);
+}
+
+function fileRow(name, sub, ...acts) {
+  return h("div", { class: "friend-row file-row" }, h("div", { class: "file-ico", text: fileExt(name) }),
+    h("span", { class: "item-main" }, h("b", { text: name }), h("span", { class: "muted", text: sub })), h("div", { class: "acts" }, ...acts));
+}
+const fileBtn = (text, cls, fn) => h("button", { class: `${cls} small`, text, onclick: async e => {
+  const b = e.currentTarget; b.disabled = true;
+  try { await fn(); } catch (er) { if (er.message !== "Cancelado.") notify(er.message); }
+  b.disabled = false;
+} });
+
+function uploadSummary(r, where) {
+  if (r.canceled) return;
+  if (r.uploaded) notify(`${r.uploaded} ${r.uploaded === 1 ? "archivo subido" : "archivos subidos"} a ${where}.`);
+  if (r.errors && r.errors.length) setTimeout(() => notify(r.errors.slice(0, 2).join(" · ") + (r.errors.length > 2 ? ` (y ${r.errors.length - 2} más)` : "")), r.uploaded ? 3400 : 0);
+}
+
+// Vista «Archivos» del aula: pestañas «Archivos privados del aula» y «Archivos NotXunta».
+async function renderFiles(root) {
+  root.append(pageTitle("TUS ARCHIVOS", "Archivos", "Tus archivos privados del aula (con el espacio que te da el aula) y los de tu cuenta NotXunta."));
+  const tabs = h("div", { class: "cloud-tabs files-tabs" }), body = h("div", {});
+  root.append(tabs, body);
+  const draw = () => {
+    const tab = state.filesTab || "aula";
+    clear(tabs);
+    for (const [key, label] of [["aula", `Privados del aula · ${state.account ? state.account.name : ""}`], ["nx", "Archivos NotXunta"]])
+      tabs.append(h("button", { type: "button", class: tab === key ? "on" : "", text: label, onclick: () => { state.filesTab = key; draw(); } }));
+    clear(body);
+    const p = tab === "aula" ? moodleFilesPanel(body, "") : nxFilesPanel(body);
+    p.catch(e => { clear(body); body.append(empty("!", "No se pudo cargar", e.message)); });
+  };
+  draw();
+}
+
+// Pantalla «Archivos NotXunta» del lanzador (no depende de ningún aula).
+async function renderNxFiles(root) {
+  clear(root);
+  root.append(pageTitle("TU CUENTA", "Archivos NotXunta", "Archivos privados guardados en tu cuenta NotXunta: los ves desde cualquier ordenador."));
+  const body = h("div", {});
+  root.append(body);
+  await nxFilesPanel(body);
+}
+
+async function moodleFilesPanel(root, dir) {
+  clear(root);
+  root.append(h("div", { class: "muted pad", text: "Cargando los archivos privados del aula…" }));
+  let r;
+  try { r = await api("filesMoodleList", state.accountId, dir); }
+  catch (e) { clear(root); root.append(empty("!", "No se pudieron cargar tus archivos privados", e.message)); return; }
+  clear(root);
+  const reload = () => moodleFilesPanel(root, dir).catch(e => notify(e.message));
+  root.append(quotaBar(r.info.used, r.info.quota, "de tu espacio en el aula"));
+  if (r.info.maxUpload) root.append(h("p", { class: "muted files-note", text: `Tamaño máximo por archivo en esta aula: ${fmtBytes(r.info.maxUpload)}.` }));
+
+  const crumbs = h("div", { class: "files-crumbs" }, h("button", { class: "secondary small", text: "Privados", onclick: () => moodleFilesPanel(root, "") }));
+  const parts = dir.split("/").filter(Boolean);
+  parts.forEach((part, i) => crumbs.append(h("span", { class: "muted", text: "›" }),
+    h("button", { class: "secondary small", text: part, onclick: () => moodleFilesPanel(root, "/" + parts.slice(0, i + 1).join("/") + "/") })));
+  root.append(h("div", { class: "files-toolbar" }, crumbs, h("div", { class: "acts" },
+    !dir && fileBtn("＋ Subir archivos", "primary", async () => {
+      const res = await api("filesMoodleUpload", state.accountId);
+      if (res.canceled) return;
+      showLoading("Actualizando…");
+      try { uploadSummary(res, "tus archivos privados del aula"); await reload(); } finally { hideLoading(); }
+    }),
+    h("button", { class: "secondary small", text: "⟳ Actualizar", onclick: reload }))));
+
+  if (!r.items.length) { root.append(empty("❐", dir ? "Carpeta vacía" : "No tienes archivos privados en el aula", dir ? "" : "Sube archivos aquí y también los verás en el aula (Área personal → Archivos privados).")); return; }
+  const list = h("div", { class: "item-list" });
+  for (const f of r.items) {
+    if (f.isdir) {
+      list.append(h("div", { class: "friend-row file-row", style: "cursor:pointer", onclick: () => moodleFilesPanel(root, f.filepath) },
+        h("div", { class: "file-ico dir", text: "▸" }), h("span", { class: "item-main" }, h("b", { text: f.name }), h("span", { class: "muted", text: "Carpeta" }))));
+      continue;
+    }
+    list.append(fileRow(f.name, [fmtBytes(f.size), f.time ? fmtDate(f.time) : ""].filter(Boolean).join(" · "),
+      fileBtn("Abrir", "primary", async () => {
+        showLoading("Abriendo el archivo…");
+        try { const res = await api("openFile", state.accountId, f.url, f.name, f.time); if (res.note) notify(res.note); }
+        finally { hideLoading(); }
+      }),
+      fileBtn("Eliminar", "secondary", async () => {
+        if (!confirm(`¿Eliminar «${f.name}» de tus archivos privados del aula? También desaparecerá de la web del aula.`)) throw new Error("Cancelado.");
+        showLoading("Eliminando…");
+        try { await api("filesMoodleDelete", state.accountId, f.filepath, f.name); notify("Archivo eliminado."); await reload(); }
+        finally { hideLoading(); }
+      })));
+  }
+  root.append(list);
+}
+
+async function nxFilesPanel(root) {
+  clear(root);
+  let st;
+  try { st = await api("cloudStatus"); } catch (e) { root.append(empty("☁", "Sin conexión con el servidor", e.message)); return; }
+  if (!st.configured) { root.append(empty("☁", "Servidor de cuentas sin configurar", "Esta versión de la app no tiene el servidor de cuentas NotXunta.")); return; }
+  if (!st.signedIn || !st.profile) {
+    root.append(h("div", { class: "empty-panel" }, h("div", { class: "empty-icon", text: "☁" }), h("h2", { text: "Entra en tu cuenta NotXunta" }),
+      h("p", { text: "Los Archivos NotXunta se guardan en tu cuenta para que los tengas en cualquier ordenador." }),
+      h("button", { class: "primary", text: "Abrir cuenta", onclick: openFriends })));
+    return;
+  }
+  if (st.presenceOutdated) { root.append(empty("!", "Falta actualizar el servidor", "Abre el SQL Editor de Supabase, pega supabase/migration-0.6.1.sql y pulsa Run. No hace falta reinstalar la app.")); return; }
+  root.append(h("div", { class: "muted pad", text: "Cargando tus archivos…" }));
+  let r;
+  try { r = await api("nxList"); } catch (e) { clear(root); root.append(empty("!", "No se pudieron cargar tus archivos", e.message)); return; }
+  clear(root);
+  const reload = () => nxFilesPanel(root).catch(e => notify(e.message));
+  root.append(quotaBar(r.usage.used, r.usage.quota, "de tu cuenta NotXunta"));
+  root.append(h("p", { class: "muted files-note", text: `Solo tú puedes verlos. ${r.usage.maxFile ? `Máximo ${fmtBytes(r.usage.maxFile)} por archivo. ` : ""}Se sincronizan con tu cuenta: aparecen en cualquier ordenador donde inicies sesión.` }));
+  root.append(h("div", { class: "files-toolbar" }, h("span", {}), h("div", { class: "acts" },
+    fileBtn("＋ Subir archivos", "primary", async () => {
+      showLoading("Subiendo archivos…");
+      try { const res = await api("nxUpload"); uploadSummary(res, "Archivos NotXunta"); if (!res.canceled) await reload(); }
+      finally { hideLoading(); }
+    }),
+    h("button", { class: "secondary small", text: "⟳ Actualizar", onclick: reload }))));
+  if (!r.files.length) { root.append(empty("❐", "Todavía no tienes archivos", "Sube apuntes, documentos o lo que quieras tener siempre a mano en tu cuenta.")); return; }
+  const list = h("div", { class: "item-list" });
+  for (const f of r.files) {
+    list.append(fileRow(f.name, [fmtBytes(f.size), new Date(f.createdAt).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" })].join(" · "),
+      fileBtn("Abrir", "primary", async () => {
+        showLoading("Abriendo el archivo…");
+        try { const res = await api("nxOpen", f.id, f.name); if (res.note) notify(res.note); }
+        finally { hideLoading(); }
+      }),
+      fileBtn("Guardar como…", "secondary", async () => {
+        showLoading("Descargando…");
+        try { if (await api("nxSave", f.id, f.name)) notify("Archivo guardado."); }
+        finally { hideLoading(); }
+      }),
+      fileBtn("Eliminar", "secondary", async () => {
+        if (!confirm(`¿Eliminar «${f.name}» de tus Archivos NotXunta? No se puede deshacer.`)) throw new Error("Cancelado.");
+        await api("nxDelete", f.id); notify("Archivo eliminado."); await reload();
+      })));
+  }
+  root.append(list);
+}

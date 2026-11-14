@@ -4,7 +4,7 @@ const { contextBridge, ipcRenderer, webFrame } = require("electron");
 const call = (channel, ...args) => ipcRenderer.invoke(channel, ...args);
 
 contextBridge.exposeInMainWorld("notxuntaClient", {
-  version: "0.6.0",
+  version: "0.6.1",
   platform: process.platform,
   listAccounts: () => call("accounts:list"),
   addAccount: acc => call("accounts:add", acc),
@@ -57,6 +57,15 @@ contextBridge.exposeInMainWorld("notxuntaClient", {
     ipcRenderer.on("cloud:badge", fn);
     return () => ipcRenderer.removeListener("cloud:badge", fn);
   },
+  // Archivos privados del aula (con su límite) y Archivos NotXunta (en tu cuenta)
+  filesMoodleList: (id, dir) => call("files:moodleList", id, dir),
+  filesMoodleUpload: id => call("files:moodleUpload", id),
+  filesMoodleDelete: (id, filepath, filename) => call("files:moodleDelete", id, filepath, filename),
+  nxList: () => call("nx:list"),
+  nxUpload: () => call("nx:upload"),
+  nxOpen: (id, name) => call("nx:open", id, name),
+  nxSave: (id, name) => call("nx:save", id, name),
+  nxDelete: id => call("nx:delete", id),
   updateStatus: () => call("update:status"),
   updateCheck: () => call("update:check"),
   updateInstall: () => call("update:install"),

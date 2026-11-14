@@ -1,4 +1,4 @@
-# NotXunta Client 0.6.0
+# NotXunta Client 0.6.1
 
 Cliente de escritorio para el Aula Virtual (Moodle) de la Xunta de Galicia. **Para Windows, Linux y macOS.**
 
@@ -48,6 +48,14 @@ Para probar sin compilar: `npm start`.
 - Google puede pedir verificación extra al iniciar sesión dentro del overlay; el botón ↗ abre la página en tu navegador.
 - Las tareas se abren en el navegador para entregarlas (no se suben archivos desde la app).
 
+## Novedades de la 0.6.1 — amigos en línea y archivos
+- **Estado «en línea» entre amigos**: en «Amigos» aparece un punto verde junto a quien tiene la app abierta (o «Visto hace 5 min»). Solo lo ven los amigos aceptados. Se desactiva en «Cuenta y amigos» → «Mostrar cuando estoy en línea». La app avisa cada 45 s; si se cierra o se apaga el PC, el punto desaparece en unos 2 minutos.
+- **Archivos privados del aula** (sección «Archivos» dentro del aula): lista (con carpetas), abrir, subir y eliminar los archivos de *Área personal → Archivos privados* de Moodle, con la barra de espacio usado y el límite del aula (`userquota`) y el máximo por archivo. Antes de subir se comprueba que cabe.
+  - Depende de lo que permita cada aula: si tiene desactivado el acceso a archivos privados desde aplicaciones externas, la app lo explica. Borrar necesita una función de Moodle que no todas las aulas ofrecen; si no se puede, la app lo avisa y hay que borrar desde la web. **No se ha podido probar contra el Aula Virtual real de la Xunta**: pruébalo con un archivo de prueba.
+- **Archivos NotXunta** (también en el menú del lanzador): archivos privados guardados en tu cuenta (Supabase Storage). Se ven desde cualquier ordenador; subir, abrir, «Guardar como…» y eliminar. Límites por defecto: 100 MB por cuenta y 25 MB por archivo (se cambian en `supabase/migration-0.6.1.sql`: `nx_quota()` y `nx_max_file()`; y el límite por archivo del bucket, una línea más abajo).
+- **Actualiza el servidor antes de publicar**: ejecuta `supabase/migration-0.6.1.sql` en Supabase → SQL Editor (crea el estado en línea, el bucket privado `nx-files` y sus reglas). Sin esto la app sigue funcionando, pero esas dos funciones avisarán de que falta.
+- Ojo con el plan gratuito de Supabase: 1 GB de Storage en total para todos los usuarios.
+
 ## Novedades de la 0.6.0 — compatibilidad con Windows, Linux y Mac
 - **Windows, Linux y macOS**: instaladores para los tres sistemas (ver arriba).
 - **Tablón «Novedades»** en la barra lateral: cada función y arreglo de cada versión (con marca «NUEVO» hasta que lo abres). Los datos están en `src/lib/changelog.js`: añade ahí una entrada cada vez que publiques una versión.
@@ -82,14 +90,14 @@ Para probar sin compilar: `npm start`.
 La app instalada busca actualizaciones al abrir y cada 6 horas, las descarga en segundo plano y las instala al cerrar (o con «Reiniciar e instalar»). Ajustes → «Actualizaciones».
 Usa GitHub Releases (gratis):
 1. Crea un repositorio y pon tu usuario en `package.json` → `build.publish[0].owner` (y `repo` si lo llamas distinto).
-2. Sube la versión en `package.json` (p. ej. `0.6.0`) y ejecuta `npm run dist`.
-3. Crea una *Release* en GitHub con la etiqueta `v0.6.0` y sube de `dist/`: `NotXuntaClient-Setup.exe`, `NotXuntaClient-Setup.exe.blockmap` y `latest.yml`.
+2. Sube la versión en `package.json` (p. ej. `0.6.1`) y ejecuta `npm run dist`.
+3. Crea una *Release* en GitHub con la etiqueta `v0.6.1` y sube de `dist/`: `NotXuntaClient-Setup.exe`, `NotXuntaClient-Setup.exe.blockmap` y `latest.yml`.
    (Alternativa automática: `set GH_TOKEN=tu_token` y `npm run release`.) Si el repositorio es privado, las actualizaciones no funcionan sin token: usa uno público.
-4. Las apps instaladas con versión anterior se actualizan solas. **Esta versión (0.6.0) se actualiza sola desde la 0.5.5 en adelante; las anteriores a la primera con actualizador hay que instalarlas a mano una vez**; a partir de ahí, todo automático.
+4. Las apps instaladas con versión anterior se actualizan solas. **Esta versión (0.6.1) se actualiza sola desde la 0.5.5 en adelante; las anteriores a la primera con actualizador hay que instalarlas a mano una vez**; a partir de ahí, todo automático.
 
 ### Publicar los tres sistemas con GitHub Actions (recomendado)
 1. Sube el proyecto (incluida la carpeta `.github/`) a tu repositorio de GitHub.
-2. Pon la versión en `package.json` y súbela: `git tag v0.6.0` y `git push origin v0.6.0`.
+2. Pon la versión en `package.json` y súbela: `git tag v0.6.1` y `git push origin v0.6.1`.
 3. En la pestaña **Actions** se compilan Windows, macOS y Linux y se publican los instaladores en una *Release* (borrador): revísala y pulsa **Publish release**. También puedes lanzarlo a mano (Run workflow) para obtener los instaladores como «artifacts» sin publicar.
 
 ### Notas por sistema

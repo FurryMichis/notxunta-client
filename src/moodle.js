@@ -182,6 +182,75 @@ class MoodleClient {
       timesortfrom: now - 7 * 86400, timesortto: now + 90 * 86400, limitnum: 100
     });
   }
+
+  // ---- Archivos privados del aula (Área personal → Archivos privados) -------------------------------
+  // Devuelve el espacio usado y los límites que fija el aula (userquota = espacio total; usermaxuploadfilesize = máximo por archivo).
+  // 0 = el aula no indica límite.
+  async privateInfo() {
+    const info = await this.siteInfo();
+    const out = {
+      userid: info.userid,
+      quota: Number(info.userquota) > 0 ? Number(info.userquota) : 0,
+      maxUpload: Number(info.usermaxuploadfilesize) > 0 ? Number(info.usermaxuploadfilesize) : 0,
+      used: 0, count: 0
+    };
+    try {
+      const r = await this.call("core_user_get_private_files_info", { userid: info.userid });
+      out.used = Number(r && r.filesize) || 0;
+      out.count = Number(r && r.filecount) || 0;
+    } catch { /* el aula no da el espacio usado: se muestra sin él */ }
+    return out;
+  }
+
+  // Contenido de una carpeta de los archivos privados (dir = "" para la raíz, o la ruta de una carpeta, p. ej. "/Apuntes/").
+  async privateFiles(userid, dir = "") {
+    const r = await this.call("core_files_get_files", {
+      contextid: 0, component: "user", filearea: "private", itemid: 0,
+      filepath: dir, filename: "", contextlevel: "user", instanceid: userid
+    });
+    const self = dir.replace(/\/+$/, "");
+    return (Array.isArray(r && r.files) ? r.files : []).map(f => {
+      const isdir = !!f.isdir;
+      const fp = f.filepath || "/";
+      let name = f.filename;
+      if (isdir && (!name || name === ".")) name = fp.split("/").filter(Boolean).pop() || "";
+      return { name: String(name || ""), isdir, filepath: fp, size: Number(f.filesize) || 0, time: Number(f.timemodified) || 0, url: f.url || "" };
+    }).filter(f => f.name && !(f.isdir && f.filepath.replace(/\/+$/, "") === self));
+  }
+
+  // Borrador con los archivos privados actuales (si el aula lo permite). Subir/borrar siempre parte de él para no pisar nada.
+  async _privateDraft() {
+    try {
+      const r = await this.call("core_user_prepare_private_files_for_edition");
+      return Number(r && (r.draftid || r.draftitemid)) || 0;
+    } catch { return 0; }
+  }
+
+  // blob: Blob del archivo (fs.openAsBlob); la comprobación de espacio la hace quien llama y, en último término, el aula.
+  async uploadPrivate(blob, filename) {
+    const draft = await this._privateDraft();
+    const form = new FormData();
+    form.append("token", this.token);
+    form.append("filepath", "/");
+    form.append("itemid", String(draft));
+    form.append("file_1", blob, filename);
+    const res = await this._fetch(this.base + "/webservice/upload.php", { method: "POST", body: form, signal: AbortSignal.timeout(300000) });
+    const text = await res.text();
+    let out;
+    try { out = JSON.parse(text); } catch { throw new Error("El aula no permite subir archivos desde aplicaciones externas."); }
+    if (!Array.isArray(out) || !out[0]) throw new Error((out && (out.error || out.message)) || "El aula rechazó el archivo.");
+    await this.call("core_user_add_user_private_files", { draftid: out[0].itemid });
+    return true;
+  }
+
+  async deletePrivate(filepath, filename) {
+    const draft = await this._privateDraft();
+    if (!draft) throw new Error("Este aula no permite borrar archivos privados desde aplicaciones externas. Bórralo desde la web del aula (Área personal → Archivos privados).");
+    await this.call("core_files_delete_draft_files", { draftitemid: draft, files: [{ filepath: filepath || "/", filename }] });
+    await this.call("core_user_add_user_private_files", { draftid: draft });
+    return true;
+  }
+
   grades(courseid, userid) { return this.call("gradereport_user_get_grade_items", { courseid, userid }); }
 }
 

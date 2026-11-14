@@ -14,6 +14,7 @@ const toasts = require("./lib/toasts");
 const updater = require("./lib/updater");
 const cloud = require("./lib/cloud");
 const sync = require("./lib/sync");
+const nxfiles = require("./lib/nxfiles");
 const splash = require("./lib/splash");
 const secure = require("./lib/secure");
 const CHANGELOG = require("./lib/changelog");
@@ -208,7 +209,7 @@ async function linkAllAccounts() {
     if (c && c.data && c.data.user) await linkAccountToCloud(acc.id, c.data.user);
   }
 }
-function afterCloudLogin() { cloud.invalidateProfile(); setTimeout(() => { linkAllAccounts(); pollFriends(); }, 1500); sync.schedule(1500); }
+function afterCloudLogin() { cloud.invalidateProfile(); setTimeout(() => { linkAllAccounts(); pollFriends(); beat(); }, 1500); sync.schedule(1500); }
 
 let knownIncoming = null, friendsTimer = null;
 function sendFriendBadge(n) {
@@ -229,6 +230,20 @@ async function pollFriends() {
     }
     knownIncoming = new Set(incoming.map(r => r.friendship_id));
   } catch { /* sin conexión: se reintenta */ }
+}
+// Estado «en línea»: mientras la app esté abierta (también en la bandeja) se avisa cada 45 s a tus amigos.
+let presenceTimer = null;
+async function beat() {
+  try {
+    if (!cloud.configured() || !cloud.isSignedIn()) return;
+    await cloud.status();          // asegura que el perfil está cargado
+    await cloud.heartbeat();
+  } catch { /* sin conexión: se reintenta en 45 s */ }
+}
+function schedulePresence() {
+  clearInterval(presenceTimer);
+  setTimeout(beat, 6000);
+  presenceTimer = setInterval(beat, 45000);
 }
 function scheduleFriends() {
   clearInterval(friendsTimer);
@@ -523,14 +538,15 @@ handle("cloud:signUp", async (_e, email, pw) => { const r = await cloud.signUp(e
 handle("cloud:signIn", async (_e, email, pw) => { await cloud.signIn(email, pw); afterCloudLogin(); return true; });
 handle("cloud:oauth", async (_e, provider) => { await cloud.signInOAuth(provider); afterCloudLogin(); return true; });
 handle("cloud:oauthCancel", () => { cloud.cancelOAuth(); return true; });
-handle("cloud:signOut", async () => { await cloud.signOut(); sync.forget(); knownIncoming = null; sendFriendBadge(0); return true; });
+handle("cloud:signOut", async () => { try { await cloud.goOffline(); } catch { /* da igual */ } await cloud.signOut(); sync.forget(); knownIncoming = null; sendFriendBadge(0); return true; });
 handle("cloud:createProfile", async (_e, p) => { await cloud.createProfile(p || {}); setTimeout(linkAllAccounts, 500); sync.schedule(800); return cloud.status(); });
 handle("cloud:updateProfile", async (_e, patch) => {
   await cloud.updateProfile(patch || {});
   if (patch && patch.discoverable === true) setTimeout(linkAllAccounts, 300);
+  if (patch && patch.show_online === true) setTimeout(beat, 300);
   return cloud.status();
 });
-handle("cloud:deleteAccount", async () => { await cloud.deleteAccount(); sync.forget(); knownIncoming = null; sendFriendBadge(0); return true; });
+handle("cloud:deleteAccount", async () => { try { await nxfiles.purgeAll(); } catch { /* si falla, el servidor conserva los archivos huérfanos */ } await cloud.deleteAccount(); sync.forget(); knownIncoming = null; sendFriendBadge(0); return true; });
 
 // ¿Quién de los participantes de este curso usa NotXunta Client?
 handle("cloud:lookup", async (_e, accountId, ids) => {
@@ -687,6 +703,81 @@ handle("instance:prefetch", (_e, id, files) => {
   return true;
 });
 
+// ---- archivos: privados del aula (con su límite de espacio) y «Archivos NotXunta» (en tu cuenta)
+const fmtMb = n => `${(n / 1048576).toFixed(n < 10485760 ? 1 : 0)} MB`;
+const cleanDir = d => (typeof d === "string" && d.length < 400 && !d.includes("..") && /^[^\x00-\x1f]*$/.test(d) ? d : "");
+
+handle("files:moodleList", async (_e, id, dir) => {
+  try {
+    return await withClient(id, async c => {
+      const d = cleanDir(dir);
+      const info = await c.privateInfo();
+      const items = await c.privateFiles(info.userid, d);
+      items.sort((a, b) => (b.isdir - a.isdir) || a.name.localeCompare(b.name, "es"));
+      return { info, items, dir: d };
+    });
+  } catch (e) { // función desactivada o sin permiso en el aula: se explica en lugar de mostrar el código de Moodle
+    if (e && e.errorcode && !["nopassword", "invalidlogin"].includes(e.errorcode))
+      throw new Error(`El aula no permite consultar tus archivos privados desde aplicaciones externas (${String(e.message).slice(0, 120)}).`);
+    throw e;
+  }
+});
+
+handle("files:moodleUpload", async (_e, id) => {
+  const r = await dialog.showOpenDialog(mainWindow, { title: "Elige archivos para subir a tus archivos privados del aula", properties: ["openFile", "multiSelections"] });
+  if (r.canceled || !r.filePaths.length) return { uploaded: 0, errors: [], canceled: true };
+  return withClient(id, async c => {
+    const info = await c.privateInfo();
+    let used = info.used;
+    const out = { uploaded: 0, errors: [] };
+    for (const file of r.filePaths.slice(0, 20)) {
+      const name = path.basename(file);
+      try {
+        const st = await fs.promises.stat(file);
+        if (!st.isFile()) throw new Error("no es un archivo");
+        if (st.size === 0) throw new Error("está vacío");
+        if (info.maxUpload && st.size > info.maxUpload) throw new Error(`supera el máximo por archivo del aula (${fmtMb(info.maxUpload)})`);
+        if (info.quota && used + st.size > info.quota) throw new Error(`no cabe en tu espacio del aula (te quedan ${fmtMb(Math.max(0, info.quota - used))})`);
+        await c.uploadPrivate(await fs.openAsBlob(file), name);
+        used += st.size; out.uploaded++;
+      } catch (e) { out.errors.push(`${name}: ${e.message}`); }
+    }
+    return out;
+  });
+});
+
+handle("files:moodleDelete", (_e, id, filepath, filename) => withClient(id, async c => {
+  filepath = cleanDir(filepath) || "/"; filename = String(filename || "");
+  if (!filename || filename.length > 255) throw new Error("Archivo no válido.");
+  await c.deletePrivate(filepath, filename);
+  const info = await c.privateInfo(); // se comprueba que de verdad ha desaparecido
+  const left = await c.privateFiles(info.userid, filepath === "/" ? "" : filepath);
+  if (left.some(f => !f.isdir && f.name === filename))
+    throw new Error("El aula no ha permitido borrarlo desde la app. Bórralo desde la web del aula (Área personal → Archivos privados).");
+  return true;
+}));
+
+handle("nx:list", () => nxfiles.overview());
+handle("nx:upload", async () => {
+  const r = await dialog.showOpenDialog(mainWindow, { title: "Elige archivos para subir a tus Archivos NotXunta", properties: ["openFile", "multiSelections"] });
+  if (r.canceled || !r.filePaths.length) return { uploaded: 0, errors: [], canceled: true };
+  return nxfiles.uploadMany(r.filePaths);
+});
+handle("nx:open", async (_e, id, name) => {
+  const file = await nxfiles.download(id, name);
+  if (DANGEROUS.test(file)) { shell.showItemInFolder(file); return { note: "Archivo ejecutable: se ha descargado pero no se abre automáticamente." }; }
+  const err = await shell.openPath(file);
+  if (err) throw new Error(err);
+  return {};
+});
+handle("nx:save", async (_e, id, name) => {
+  const r = await dialog.showSaveDialog(mainWindow, { title: "Guardar archivo", defaultPath: path.join(app.getPath("downloads"), nxfiles.cleanName(name)) });
+  if (r.canceled || !r.filePath) return false;
+  await nxfiles.downloadTo(id, r.filePath);
+  return true;
+});
+handle("nx:delete", (_e, id) => nxfiles.remove(id));
+
 async function purgeOldDocs() { // al arrancar: se borran los apuntes en caché con más de 3 días
   try {
     for (const d of await fs.promises.readdir(docsDir())) {
@@ -830,7 +921,7 @@ if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   app.on("second-instance", showMain);
-  app.on("before-quit", () => { quitting = true; });
+  app.on("before-quit", () => { quitting = true; cloud.goOffline().catch(() => {}); }); // mejor esfuerzo: si no llega, el estado caduca solo en 2 min
   app.on("will-quit", () => { overlay.destroy(); toasts.destroy(); });
   app.whenReady().then(async () => {
     // Windows/Linux: sin menú (los atajos de zoom los gestiona la propia app). macOS necesita un menú mínimo (Salir, copiar/pegar).
@@ -866,6 +957,7 @@ if (!app.requestSingleInstanceLock()) {
     purgeOldDocs();
     updater.schedule(result === "error" || result === "timeout" ? 20000 : null); // si ya se comprobó al arrancar, no se repite enseguida
     scheduleFriends();
+    schedulePresence();
     sync.schedule(8000);       // trae los ajustes de tu cuenta NotXunta (si has iniciado sesión)
     setTimeout(() => {
       const keep = settings.get().keepBackground;

@@ -3,6 +3,16 @@
 // kind: "new" = función nueva · "fix" = arreglo · "improve" = mejora
 module.exports = [
   {
+    version: "0.6.1", headline: "Amigos en línea y archivos",
+    summary: "Ves cuándo están conectados tus amigos y ya puedes gestionar tus archivos privados del aula y los de tu cuenta NotXunta.",
+    items: [
+      { kind: "new", title: "Amigos en línea", text: "En «Amigos» aparece un punto verde junto a quien tiene NotXunta Client abierto, o cuándo se le vio por última vez. Solo lo ven sus amigos y se puede desactivar en «Cuenta y amigos»." },
+      { kind: "new", title: "Archivos privados del aula", text: "Nueva sección «Archivos»: ves, abres, subes y eliminas tus archivos privados del aula, con la barra del espacio usado y el límite que te da el aula." },
+      { kind: "new", title: "Archivos NotXunta", text: "Tus propios archivos privados, guardados en tu cuenta NotXunta: los tienes en cualquier ordenador donde inicies sesión. También con barra de espacio." },
+      { kind: "improve", title: "Servidor", text: "Esta versión necesita ejecutar supabase/migration-0.6.1.sql en Supabase (una sola vez). Sin eso la app funciona, pero el estado en línea y los Archivos NotXunta avisarán de que falta." }
+    ]
+  },
+  {
     version: "0.6.0", headline: "Ahora también para Linux y Mac",
     summary: "NotXunta Client deja de ser solo para Windows: a partir de esta versión hay instaladores para Windows, Linux y macOS.",
     items: [
