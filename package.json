@@ -1,6 +1,6 @@
 {
   "name": "notxunta-client",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "description": "Cliente de escritorio para el Aula Virtual (Moodle) de la Xunta de Galicia · Windows, Linux y macOS",
   "main": "src/main.js",
   "scripts": {
@@ -64,7 +64,8 @@
       {
         "provider": "github",
         "owner": "FurryMichis",
-        "repo": "notxunta-client"
+        "repo": "notxunta-client",
+        "releaseType": "release"
       }
     ],
     "mac": {

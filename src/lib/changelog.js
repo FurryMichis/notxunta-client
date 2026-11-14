@@ -3,7 +3,7 @@
 // kind: "new" = función nueva · "fix" = arreglo · "improve" = mejora
 module.exports = [
   {
-    version: "0.6.2", headline: "Arreglos: Amigos y Apariencia",
+    version: "0.6.3", headline: "Arreglos: Amigos y Apariencia",
     summary: "Vuelven a funcionar las pestañas «Cuenta y amigos» y «Apariencia», y los archivos pasan a ser solo los de tu cuenta NotXunta.",
     items: [
       { kind: "fix", title: "La pestaña «Cuenta y amigos» salía vacía", text: "Solo se veía el título. Un error al dibujar el interruptor «Mostrar cuando estoy en línea» cortaba la pantalla entera. Ya se ve tu cuenta, tu foto y la lista de amigos con su estado en línea." },
