@@ -3,6 +3,15 @@
 // kind: "new" = función nueva · "fix" = arreglo · "improve" = mejora
 module.exports = [
   {
+    version: "0.6.5", headline: "Actualizaciones más fiables",
+    summary: "Arreglos en el actualizador automático: ya no se queda en bucle y la publicación de versiones es más segura.",
+    items: [
+      { kind: "fix", title: "Fin del bucle de actualización", text: "Si la app se reiniciaba para instalar una versión y al volver a abrir seguía siendo la anterior, volvía a descargarla e instalarla sin parar. Ahora solo lo intenta una vez cada 24 horas y, si no ha funcionado, te lo avisa y abre la página de versiones." },
+      { kind: "fix", title: "Ya no se queda parada en la pantalla de inicio", text: "Si una descarga se queda sin avanzar durante un minuto, la app se abre igualmente (y puedes seguir usándola)." },
+      { kind: "improve", title: "Publicación de versiones más segura", text: "El flujo de GitHub se niega a publicar si la etiqueta (p. ej. v0.6.5) no coincide con la versión del package.json, que era lo que dejaba un latest.yml con otra versión. Además publica lo que haya aunque falle Mac o Linux, y deja la release como «Latest»." }
+    ]
+  },
+  {
     version: "0.6.4", headline: "Actualización de seguridad",
     summary: "Revisión completa de seguridad: se cierran varios puntos débiles en descargas, inicio de sesión, datos de la nube y empaquetado. Se recomienda actualizar.",
     items: [

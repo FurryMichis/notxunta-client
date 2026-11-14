@@ -18,6 +18,7 @@ const nxfiles = require("./lib/nxfiles");
 const splash = require("./lib/splash");
 const secure = require("./lib/secure");
 const safefile = require("./lib/safefile");
+const updateGuard = require("./lib/updateguard");
 const CHANGELOG = require("./lib/changelog");
 const RELEASES_URL = "https://github.com/FurryMichis/notxunta-client/releases/latest";
 
@@ -391,6 +392,7 @@ function scheduleBackground(firstDelayMs) {
   bgTimer = setTimeout(async () => { await backgroundSync(); scheduleBackground(); }, firstDelayMs || s.syncMinutes * 60000);
 }
 
+let bootNote = null; // aviso para mostrar al abrir (p. ej. una actualización que no se pudo instalar)
 let booting = true; // mientras se ve la pantalla de inicio no se abre la ventana principal por otras vías
 function showMain() {
   if (booting) return;
@@ -874,12 +876,24 @@ async function startupScreen() {
   splash.setClosedHandler(() => { if (booting && !quitting) { quitting = true; app.quit(); } }); // cerrar la pantalla de inicio (Alt+F4) = salir
   splash.update({ text: "Iniciando…", percent: -1, canSkip: false });
   splash.setSkipHandler(() => updater.skipStartup());
+
+  // Freno anti-bucle: si la última vez se reinició para instalar y seguimos en la versión anterior, no se repite (24 h).
+  const guard = updateGuard.evaluate(userDir(), app.getVersion());
+  if (guard.blocked) {
+    bootNote = { title: "No se pudo instalar la actualización", body: `Se intentó instalar la ${guard.failedVersion} pero sigues en la ${app.getVersion()}. Descarga el instalador desde la página de versiones. Pulsa aquí para abrirla.` };
+    splash.update({ text: "Iniciando…", percent: -1, canSkip: false });
+    await wait(Math.max(500, 1200 - (Date.now() - t0)));
+    return "blocked";
+  }
+
   const r = await updater.startupCheck(st => splash.update(st));
   if (r === "ready") {
     splash.update({ text: "Instalando la actualización…", percent: 100, canSkip: false });
     await wait(700);
     quitting = true;
+    updateGuard.record(userDir(), updater.getStatus().version);   // si al volver a abrir no es esa versión, no se reintenta en bucle
     if (updater.installSilently()) return "installing";
+    updateGuard.clear(userDir());
     quitting = false;
   }
   const finalText = r === "none" ? "Todo al día. Iniciando…"
@@ -934,6 +948,7 @@ if (!app.requestSingleInstanceLock()) {
     scheduleFriends();
     schedulePresence();
     sync.schedule(8000);       // trae los ajustes de tu cuenta NotXunta (si has iniciado sesión)
+    if (bootNote) setTimeout(() => announce(bootNote.title, bootNote.body, "", "releases"), 3500);
     setTimeout(() => {
       const keep = settings.get().keepBackground;
       announce("NotXunta Client", `${keep ? "Se mantiene en segundo plano. " : ""}Pulsa Shift+Tab para abrir el overlay.`, "", "overlay");

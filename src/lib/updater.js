@@ -66,13 +66,15 @@ function schedule(firstDelayMs = 20000) {
 //   "available" hay versión nueva pero hay que descargarla a mano (macOS / Linux .deb)
 //   "skipped"   el usuario ha pulsado «Continuar sin actualizar» durante la descarga (sigue en segundo plano)
 // onProgress({ text, percent, canSkip }) va actualizando el texto de la pantalla de inicio.
-function startupCheck(onProgress, { timeoutMs = 10000 } = {}) {
+function startupCheck(onProgress, { timeoutMs = 10000, stallMs = 60000 } = {}) {
   return new Promise(resolve => {
     if (!autoUpdater || !deps.enabled()) { resolve("skip"); return; }
-    let done = false, checkTimer = null;
+    let done = false, checkTimer = null, stallTimer = null;
     const handlers = {};
     const off = () => { for (const [ev, fn] of Object.entries(handlers)) autoUpdater.removeListener(ev, fn); };
-    const finish = r => { if (done) return; done = true; clearTimeout(checkTimer); off(); resolve(r); };
+    const finish = r => { if (done) return; done = true; clearTimeout(checkTimer); clearTimeout(stallTimer); off(); resolve(r); };
+    // Si la descarga se queda parada (sin progreso durante un minuto) se abre la app igualmente, en vez de quedarse en la pantalla de inicio.
+    const armStall = () => { clearTimeout(stallTimer); stallTimer = setTimeout(() => finish("timeout"), stallMs); };
     const on = (ev, fn) => { handlers[ev] = fn; autoUpdater.on(ev, fn); };
 
     on("update-not-available", () => finish("none"));
@@ -80,9 +82,13 @@ function startupCheck(onProgress, { timeoutMs = 10000 } = {}) {
     on("update-available", info => {
       if (manualOnly()) { finish("available"); return; }   // en Mac / .deb no se descarga: solo se avisa
       clearTimeout(checkTimer);   // la descarga puede tardar: ya no corre el límite de la comprobación
+      armStall();
       onProgress({ text: `Descargando la versión ${info.version}…`, percent: 0, canSkip: true });
     });
-    on("download-progress", p => onProgress({ text: `Descargando la versión ${status.version}… ${Math.round(p.percent || 0)} %`, percent: Math.round(p.percent || 0), canSkip: true }));
+    on("download-progress", p => {
+      armStall();
+      onProgress({ text: `Descargando la versión ${status.version}… ${Math.round(p.percent || 0)} %`, percent: Math.round(p.percent || 0), canSkip: true });
+    });
     on("update-downloaded", () => finish("ready"));
 
     checkTimer = setTimeout(() => finish("timeout"), timeoutMs);
