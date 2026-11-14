@@ -1,5 +1,8 @@
 name: Compilar NotXunta Client
 
+# Se ejecuta al crear una Release / subir una etiqueta de versión (p. ej. v0.6.2): compila Windows, macOS y Linux
+# y SUBE los instaladores a la Release de esa etiqueta (los crea si no existe). Si se lanza a mano (Actions → Run workflow)
+# solo deja los instaladores como «artifacts» descargables, sin publicar nada.
 on:
   push:
     tags: ["v*"]
@@ -29,9 +32,9 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Compilar
-        run: npx electron-builder ${{ matrix.args }} --publish ${{ startsWith(github.ref, 'refs/tags/v') && 'always' || 'never' }}
+        run: npx electron-builder ${{ matrix.args }} --publish never
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Sin certificado de Apple la app de Mac se genera sin firmar.
           CSC_IDENTITY_AUTO_DISCOVERY: ${{ matrix.os == 'macos-latest' && 'false' || '' }}
       - uses: actions/upload-artifact@v4
         with:
@@ -42,6 +45,24 @@ jobs:
             dist/*.zip
             dist/*.AppImage
             dist/*.deb
-            dist/*.yml
+            dist/latest*.yml
             dist/*.blockmap
           if-no-files-found: warn
+
+  publicar:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Publicar en la Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1 || gh release create "$TAG" --repo "$REPO" --title "${TAG#v}" --notes "NotXunta Client ${TAG#v}"
+          gh release upload "$TAG" dist/* --repo "$REPO" --clobber
