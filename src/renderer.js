@@ -343,9 +343,11 @@ function applyLook() {
   $("#bg-layer").dataset.bg = noMedia ? "none" : look.bg;
   syncVideo();
   applySound();
-  $("#bg-art").style.backgroundImage = look.bg === "image" && look.image ? `url("${look.image}")` : "";
-  $("#bg-dim").style.opacity = String(look.dim / 100);
-  document.documentElement.style.setProperty("--accent", look.accent);
+  // Última barrera: aunque algo raro llegara hasta aquí, solo se pinta una imagen «data:» válida y un color #rrggbb.
+  const okImg = typeof look.image === "string" && /^data:image\/(png|jpeg|gif|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(look.image);
+  $("#bg-art").style.backgroundImage = look.bg === "image" && okImg ? `url("${look.image}")` : "";
+  $("#bg-dim").style.opacity = String(Math.min(100, Math.max(0, Number(look.dim) || 0)) / 100);
+  document.documentElement.style.setProperty("--accent", /^#[0-9a-fA-F]{6}$/.test(look.accent) ? look.accent : DEFAULTS.accent);
   if (look.bg === "galaxy") startStars(); else stopStars();
 }
 

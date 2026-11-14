@@ -88,7 +88,11 @@ class MoodleClient {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: body.toString(),
+      redirect: "error",   // el aula no debe redirigir estas peticiones: si lo hiciera, la contraseña/token podrían acabar en otro sitio
       signal: AbortSignal.timeout(40000)
+    }).catch(e => {
+      if (e && e.name !== "TimeoutError" && e.cause && /redirect/i.test(String(e.cause.message || e.cause))) throw new Error("El aula redirige a otra dirección. Usa el enlace final y completo (con https://).");
+      throw e;
     });
     if (!res.ok) throw new Error(`El aula respondió con el error HTTP ${res.status}.`);
     const text = await res.text();

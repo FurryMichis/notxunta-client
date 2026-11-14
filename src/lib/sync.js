@@ -39,10 +39,21 @@ function saveState() {
 }
 
 // ------------------------------------------------------------------ valores locales
+// Lo que llega de la nube NO es de fiar (otro equipo, o alguien con acceso a la cuenta, podría haber guardado cualquier cosa):
+// cada valor se comprueba y se descarta si no tiene exactamente la forma esperada. Así nada puede «salirse» del CSS ni del HTML.
+const BG_VALUES = ["none", "galaxy", "nebula", "sunset", "aurora", "vivid", "image", "video"];
+const IMG_RE = /^data:image\/(png|jpeg|gif|webp);base64,[A-Za-z0-9+/]+={0,2}$/;
+const LOOK_CHECK = {
+  bg: v => typeof v === "string" && BG_VALUES.includes(v),
+  dim: v => typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 100,
+  image: v => typeof v === "string" && (v === "" || (v.length <= MAX_IMAGE && IMG_RE.test(v))),
+  accent: v => typeof v === "string" && /^#[0-9a-fA-F]{6}$/.test(v),
+  sound: v => typeof v === "boolean",
+  volume: v => typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 100
+};
 function pickLook(l) {
   const out = {};
-  for (const k of LOOK_KEYS) if (l && l[k] !== undefined) out[k] = l[k];
-  if (typeof out.image === "string" && out.image.length > MAX_IMAGE) out.image = "";
+  for (const k of LOOK_KEYS) if (l && l[k] !== undefined && LOOK_CHECK[k](l[k])) out[k] = l[k];
   return out;
 }
 const pickPrefs = p => { const out = {}; for (const k of PREF_KEYS) if (p && k in p) out[k] = p[k]; return out; };

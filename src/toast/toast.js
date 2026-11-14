@@ -12,7 +12,7 @@ window.toastApi.onShow(p => {
     : p.action === "update" ? "Pulsa para reiniciar e instalar" : p.action === "releases" ? "Pulsa para abrir la página de descarga" : p.action === "friends" ? "Pulsa para ver tus solicitudes" : p.action.startsWith("messages:") ? "Pulsa para abrir tus mensajes" : "Pulsa para abrir NotXunta Client";
   const ico = $("ico");
   ico.textContent = ""; ico.style.backgroundImage = "";
-  if (p.icon && p.icon.startsWith("data:image/")) ico.style.backgroundImage = `url("${p.icon}")`;
+  if (p.icon && /^data:image\/(png|jpeg|gif|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(p.icon)) ico.style.backgroundImage = `url("${p.icon}")`;
   else ico.textContent = p.icon || "🔔";
   el.classList.remove("out");
   void el.offsetWidth; // reinicia la animación

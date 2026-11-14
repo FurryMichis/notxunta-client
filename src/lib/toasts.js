@@ -63,7 +63,12 @@ function show(payload) {
   const clean = {
     title: String(payload.title || "NotXunta Client").slice(0, 80),
     body: String(payload.body || "").slice(0, 200),
-    icon: typeof payload.icon === "string" ? payload.icon.slice(0, 200000) : "",
+    // Icono: una imagen «data:» sencilla (png/jpeg/gif/webp) o un texto corto/emoji. Nada que pueda salirse del CSS.
+    icon: typeof payload.icon === "string"
+      ? (payload.icon.startsWith("data:image/")
+          ? (/^data:image\/(png|jpeg|gif|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(payload.icon) && payload.icon.length <= 200000 ? payload.icon : "")
+          : payload.icon.replace(/[\u0000-\u001f]/g, "").slice(0, 8))
+      : "",
     action: payload.action === "overlay" ? "overlay" : payload.action === "update" ? "update" : payload.action === "releases" ? "releases" : payload.action === "friends" ? "friends" : /^messages:[\w-]{1,64}$/.test(String(payload.action)) ? String(payload.action) : "app"
   };
   queue.push({ payload: clean });

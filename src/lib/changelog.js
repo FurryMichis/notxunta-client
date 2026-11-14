@@ -3,7 +3,21 @@
 // kind: "new" = función nueva · "fix" = arreglo · "improve" = mejora
 module.exports = [
   {
-    version: "0.6.3", headline: "Arreglos: Amigos y Apariencia",
+    version: "0.6.4", headline: "Actualización de seguridad",
+    summary: "Revisión completa de seguridad: se cierran varios puntos débiles en descargas, inicio de sesión, datos de la nube y empaquetado. Se recomienda actualizar.",
+    items: [
+      { kind: "fix", title: "Archivos descargados más seguros", text: "Los apuntes y Archivos NotXunta ahora se guardan en una carpeta privada de tu usuario (no en la carpeta temporal compartida), con nombres de archivo saneados. En Windows se marcan como «descargados de Internet», así Office y SmartScreen los comprueban antes de abrirlos." },
+      { kind: "fix", title: "Más tipos de archivo peligroso bloqueados", text: "Programas, scripts, accesos directos, instaladores, imágenes de disco y documentos con macros (.exe, .lnk, .ps1, .docm, .iso, .app, .sh…) nunca se abren solos: solo se muestran en su carpeta." },
+      { kind: "fix", title: "Inicio de sesión con Google/Discord/GitHub más blindado", text: "La pequeña página local que recibe la respuesta del inicio de sesión ahora solo acepta peticiones de tu propio equipo, con cabeceras de seguridad, y descarta cualquier otra visita." },
+      { kind: "fix", title: "Datos de la nube comprobados", text: "El aspecto (fondo, color, brillo), los avisos y los ajustes que llegan de la nube se validan uno a uno antes de aplicarse, para que un dato manipulado no pueda alterar la interfaz." },
+      { kind: "fix", title: "Contraseña del aula protegida", text: "Las peticiones de inicio de sesión al aula ya no siguen redirecciones, para que la contraseña no pueda acabar en otro sitio. Imágenes del aula: solo formatos normales (sin SVG) y con tope de tamaño." },
+      { kind: "fix", title: "Enlaces y ventanas", text: "Los enlaces con usuario y contraseña incrustados se rechazan; ninguna ventana puede incrustar contenido externo; y la app no concede cámara, micrófono ni ubicación a nadie." },
+      { kind: "improve", title: "Electron actualizado y cerrado", text: "Se pasa a Electron 43 (la 35 ya no recibe parches de seguridad) y se desactivan en el ejecutable las opciones de depuración y de ejecutar como Node. Reglas CSP más estrictas en todas las pantallas." },
+      { kind: "improve", title: "Servidor", text: "Esta versión incluye supabase/migration-0.6.4.sql (límites por cuenta: aulas vinculadas y archivos). Ejecútalo una vez en Supabase → SQL Editor." }
+    ]
+  },
+  {
+    version: "0.6.2", headline: "Arreglos: Amigos y Apariencia",
     summary: "Vuelven a funcionar las pestañas «Cuenta y amigos» y «Apariencia», y los archivos pasan a ser solo los de tu cuenta NotXunta.",
     items: [
       { kind: "fix", title: "La pestaña «Cuenta y amigos» salía vacía", text: "Solo se veía el título. Un error al dibujar el interruptor «Mostrar cuando estoy en línea» cortaba la pantalla entera. Ya se ve tu cuenta, tu foto y la lista de amigos con su estado en línea." },

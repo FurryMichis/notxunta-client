@@ -4,7 +4,7 @@
 // supabase/migration-0.6.1.sql). Los límites (por archivo y por cuenta) los marca el servidor y la app solo los lee.
 
 const fs = require("node:fs");
-const os = require("node:os");
+const safefile = require("./safefile");
 const path = require("node:path");
 const crypto = require("node:crypto");
 const { Readable } = require("node:stream");
@@ -22,10 +22,10 @@ const MIME = {
   odt: "application/vnd.oasis.opendocument.text", mp3: "audio/mpeg", mp4: "video/mp4"
 };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const cleanName = n => path.basename(String(n || "archivo")).replace(/[\u0000-\u001f<>:"/\\|?*]/g, "_").trim().slice(0, 180) || "archivo";
+const cleanName = n => safefile.safeName(n, 180);
 const mimeOf = name => MIME[path.extname(name).slice(1).toLowerCase()] || "application/octet-stream";
 const mb = n => `${(n / 1048576).toFixed(n < 10485760 ? 1 : 0)} MB`;
-const tempDir = () => path.join(os.tmpdir(), "notxunta-client-docs", "nx"); // la limpieza de apuntes antiguos también barre esto
+const tempDir = () => path.join(safefile.docsDir(), "nx"); // carpeta privada del usuario; la limpieza de apuntes antiguos también barre esto
 
 async function storageError(res) {
   let data = null;
@@ -84,10 +84,12 @@ async function downloadTo(id, target) {
   if (!UUID.test(String(id))) throw new Error("Archivo no válido.");
   const res = await cloud.raw("GET", `/storage/v1/object/authenticated/${BUCKET}/${cloud.userId()}/${id}`, { timeout: 300000 });
   if (!res.ok) throw res.status === 404 ? new Error("El archivo ya no existe en el servidor.") : await storageError(res);
+  await safefile.ensurePrivateDir(safefile.docsDir());
   await fs.promises.mkdir(path.dirname(target), { recursive: true });
   const tmp = target + ".part";
   await pipeline(Readable.fromWeb(res.body), fs.createWriteStream(tmp)); // en disco según llega
   await fs.promises.rename(tmp, target);
+  await safefile.markWeb(target);   // Windows: Office abrirá el archivo en Vista protegida
   return target;
 }
 

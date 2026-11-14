@@ -1,5 +1,5 @@
 "use strict";
-const { app, BrowserWindow, ipcMain, safeStorage, shell, Notification, Tray, Menu, nativeImage, dialog, protocol } = require("electron");
+const { app, BrowserWindow, ipcMain, safeStorage, shell, Notification, Tray, Menu, nativeImage, dialog, protocol, session } = require("electron");
 const path = require("node:path");
 const fs = require("node:fs");
 const os = require("node:os");
@@ -17,6 +17,7 @@ const sync = require("./lib/sync");
 const nxfiles = require("./lib/nxfiles");
 const splash = require("./lib/splash");
 const secure = require("./lib/secure");
+const safefile = require("./lib/safefile");
 const CHANGELOG = require("./lib/changelog");
 const RELEASES_URL = "https://github.com/FurryMichis/notxunta-client/releases/latest";
 
@@ -630,23 +631,31 @@ handle("instance:image", async (_e, id, url) => {
   if (imageCache.has(cacheKey)) return imageCache.get(cacheKey);
   const data = await withClient(id, async c => {
     const res = await fetch(c.withToken(url), { signal: AbortSignal.timeout(30000) });
-    const type = res.headers.get("content-type") || "";
-    if (!res.ok || !type.startsWith("image/")) throw new Error("Imagen no disponible.");
-    const buf = Buffer.from(await res.arrayBuffer());
-    if (buf.length > 8 * 1024 * 1024) throw new Error("Imagen demasiado grande.");
-    return `data:${type.split(";")[0]};base64,${buf.toString("base64")}`;
+    const type = (res.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+    // Solo formatos de imagen «normales» (el SVG puede traer scripts y no se necesita para fotos de perfil ni banners)
+    if (!res.ok || !/^image\/(png|jpeg|jpg|gif|webp|bmp|avif)$/.test(type)) throw new Error("Imagen no disponible.");
+    const MAX_IMG = 8 * 1024 * 1024;
+    if (Number(res.headers.get("content-length")) > MAX_IMG) { res.body && res.body.cancel().catch(() => {}); throw new Error("Imagen demasiado grande."); }
+    const chunks = []; let total = 0;                      // se lee por trozos y se corta al pasar el límite (no se carga una respuesta enorme entera)
+    for await (const ch of Readable.fromWeb(res.body)) {
+      total += ch.length;
+      if (total > MAX_IMG) throw new Error("Imagen demasiado grande.");
+      chunks.push(ch);
+    }
+    const buf = Buffer.concat(chunks);
+    return `data:${type};base64,${buf.toString("base64")}`;
   });
+  if (imageCache.size >= 300) imageCache.delete(imageCache.keys().next().value);   // caché acotada: no crece sin límite
   imageCache.set(cacheKey, data);
   return data;
 });
 
-const DANGEROUS = /\.(exe|bat|cmd|com|msi|scr|ps1|vbs|vbe|js|jse|wsf|wsh|lnk|hta|jar|reg|dll|pif|cpl|app|command|sh|bash|zsh|run|bin|appimage|deb|rpm|dmg|pkg|desktop|workflow|action|scpt|scptd|terminal|webloc|inetloc)$/i;
+const { DANGEROUS, safeName } = safefile;
 
 // Los apuntes se guardan en una caché temporal: abrir de nuevo el mismo archivo es instantáneo y,
 // al entrar en un tema, los documentos se descargan en segundo plano para que abran sin esperar.
-const docsDir = () => path.join(os.tmpdir(), "notxunta-client-docs");
+const docsDir = safefile.docsDir;   // dentro de la carpeta de datos del usuario (no en /tmp, que en Linux es compartida)
 const docInflight = new Map();
-const safeName = n => path.basename(String(n || "archivo")).replace(/[<>:"/\\|?*\x00-\x1f]/g, "_").slice(0, 120) || "archivo";
 
 function docTarget(accountId, url, filename, version) {
   const hash = crypto.createHash("sha1").update(`${accountId}|${url}|${Number(version) || 0}`).digest("hex").slice(0, 16);
@@ -663,6 +672,7 @@ async function ensureDoc(accountId, url, filename, version, maxBytes) {
     const type = res.headers.get("content-type") || "";
     const len = Number(res.headers.get("content-length")) || 0;
     if (maxBytes && len > maxBytes) { res.body && res.body.cancel().catch(() => {}); return null; }
+    await safefile.ensurePrivateDir(docsDir());
     await fs.promises.mkdir(path.dirname(target), { recursive: true });
     const tmp = target + ".part";
     if (type.includes("json") && len < 4096) { // posible error del aula en lugar del archivo
@@ -673,6 +683,7 @@ async function ensureDoc(accountId, url, filename, version, maxBytes) {
       await pipeline(Readable.fromWeb(res.body), fs.createWriteStream(tmp)); // en disco según llega, sin cargarlo entero en memoria
     }
     await fs.promises.rename(tmp, target);
+    await safefile.markWeb(target, url);   // Windows: Office abrirá el archivo en Vista protegida
     return target;
   }).finally(() => docInflight.delete(target));
   docInflight.set(target, job);
@@ -736,8 +747,11 @@ async function purgeOldDocs() { // al arrancar: se borran los apuntes en caché 
 }
 
 handle("instance:openExternal", async (_e, url) => {
-  const u = new URL(url);
+  if (typeof url !== "string" || url.length > 2048) throw new Error("Enlace no permitido.");
+  let u;
+  try { u = new URL(url); } catch { throw new Error("Enlace no permitido."); }
   if (u.protocol !== "https:" && u.protocol !== "http:") throw new Error("Enlace no permitido.");
+  if (u.username || u.password) throw new Error("Enlace no permitido (lleva usuario y contraseña incrustados).");
   await shell.openExternal(u.toString());
   return true;
 });
@@ -795,6 +809,19 @@ handle("api:notifications", (_e, id, userId) => withClient(id, async c => {
     time: n.timecreated, read: !!n.read, url: n.contexturl || ""
   }));
 }));
+
+// ---------------------------------------------------------------- endurecimiento general
+// Ninguna ventana puede incrustar <webview>, y la sesión por defecto (ventanas propias con archivos locales) no concede
+// ningún permiso (cámara, micrófono, ubicación, notificaciones, portapapeles…). El navegador del overlay tiene su propia sesión.
+app.on("web-contents-created", (_e, contents) => {
+  contents.on("will-attach-webview", ev => ev.preventDefault());
+});
+function hardenDefaultSession() {
+  const ses = session.defaultSession;
+  ses.setPermissionRequestHandler((_wc, _perm, cb) => cb(false));
+  ses.setPermissionCheckHandler(() => false);
+  ses.setDevicePermissionHandler(() => false);
+}
 
 // ---------------------------------------------------------------- ventana
 function createWindow() {
@@ -878,6 +905,7 @@ if (!app.requestSingleInstanceLock()) {
       { label: "Ventana", submenu: [{ role: "minimize" }, { role: "close" }] }
     ]));
     else Menu.setApplicationMenu(null);
+    hardenDefaultSession();
     registerMediaProtocol();
     overlay.init({
       getSettings: settings.get,

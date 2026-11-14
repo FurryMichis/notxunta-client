@@ -183,11 +183,20 @@ async function signInOAuth(provider) {
     const timer = setTimeout(() => { done(); reject(new Error("Se agotó el tiempo para iniciar sesión.")); }, 180000);
     oauthAbort = e => { done(); reject(e); };
     const server = http.createServer((req, res) => {
-      const u = new URL(req.url, "http://127.0.0.1");
-      if (u.pathname !== "/callback") { res.writeHead(404); res.end(); return; }
+      // Solo se atiende al navegador del propio equipo: el Host debe ser exactamente 127.0.0.1:puerto (frena el «DNS rebinding»)
+      // y solo se admite GET. Cualquier otra cosa se descarta sin tocar el inicio de sesión en curso.
+      let u;
+      try { u = new URL(req.url, "http://127.0.0.1"); } catch { res.writeHead(400); res.end(); return; }
+      if (req.headers.host !== `127.0.0.1:${OAUTH_PORT}` || req.method !== "GET" || u.pathname !== "/callback") { res.writeHead(404, { Connection: "close" }); res.end(); return; }
       const c = u.searchParams.get("code");
+      if (!c && !u.searchParams.has("error") && !u.searchParams.has("error_description")) { res.writeHead(404, { Connection: "close" }); res.end(); return; }  // p. ej. /favicon o visitas sueltas
+      if (c && !/^[\w.~-]{8,512}$/.test(c)) { res.writeHead(400, { Connection: "close" }); res.end(); return; }
       const err = u.searchParams.get("error_description") || u.searchParams.get("error");
-      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", Connection: "close" });
+      res.writeHead(200, {
+        "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", Connection: "close",
+        "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+        "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer", "X-Frame-Options": "DENY"
+      });
       res.end(CALLBACK_PAGE(!!c));
       done();
       if (c) resolve(c); else reject(new Error(err ? String(err).slice(0, 160) : "Inicio de sesión cancelado."));

@@ -113,6 +113,8 @@ function ensureView(tab) {
   if (tabAlive(tab)) return tab.view;
   const ses = session.fromPartition(PARTITION);
   ses.setPermissionRequestHandler((_wc, _perm, cb) => cb(false)); // sin cámara, micrófono, ubicación…
+  ses.setPermissionCheckHandler(() => false);
+  ses.setDevicePermissionHandler(() => false);
   const view = new WebContentsView({
     webPreferences: { partition: PARTITION, sandbox: true, contextIsolation: true, nodeIntegration: false }
   });
