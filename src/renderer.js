@@ -402,13 +402,6 @@ function renderAppearance(root) {
   clear(root);
   root.append(pageTitle("PERSONALIZACIÓN", "Apariencia", "Elige un fondo (imagen, GIF o vídeo), el tamaño de la interfaz y el color principal de NotXunta Client."));
 
-  const onlineCb = h("input", { type: "checkbox" }); onlineCb.checked = p.show_online !== false;
-  onlineCb.addEventListener("change", async () => {
-    onlineCb.disabled = true;
-    try { await api("cloudUpdateProfile", { show_online: onlineCb.checked }); notify(onlineCb.checked ? "Tus amigos ya ven cuándo estás en línea." : "Tu estado en línea ya no es visible."); }
-    catch (e) { onlineCb.checked = !onlineCb.checked; notify(e.message); }
-    onlineCb.disabled = false;
-  });
   const fileInput = h("input", { type: "file", accept: "image/*", hidden: "" });
   fileInput.addEventListener("change", async () => {
     const f = fileInput.files[0]; fileInput.value = "";
@@ -610,7 +603,7 @@ const IVIEWS = {
   grades: ["CALIFICACIONES", renderGrades],
   messages: ["MENSAJES", renderMessages],
   notifications: ["NOTIFICACIONES", renderNotifications],
-  files: ["ARCHIVOS", renderFiles],
+  files: ["ARCHIVOS", renderNxFiles],
   friends: ["AMIGOS", renderCloud],
   profile: ["PERFIL", renderProfile],
   appearance: ["APARIENCIA", renderAppearance],
@@ -869,8 +862,9 @@ async function renderCloud(root) {
   }
   if (!st.signedIn) { root.append(authCard(redo)); return; }
   if (!st.profile) { root.append(profileSetupCard(redo, st)); return; }
-  const card = accountCard(redo, st);
-  const panel = await friendsPanel(redo);
+  let card, panel;
+  try { card = accountCard(redo, st); } catch (e) { card = empty("!", "No se pudo mostrar tu cuenta", e.message); }
+  try { panel = await friendsPanel(redo); } catch (e) { panel = empty("!", "No se pudieron cargar tus amigos", e.message); }
   if (stale()) return;
   root.append(card);
   if (st.schemaOutdated || st.presenceOutdated) root.append(h("div", { class: "cloud-card" }, h("h2", { text: "Falta actualizar el servidor" }),
@@ -987,6 +981,13 @@ function accountCard(redo, st) {
     try { await api("cloudUpdateProfile", { discoverable: cb.checked }); notify(cb.checked ? "Tus compañeros ya pueden encontrarte." : "Ya no apareces ante tus compañeros."); }
     catch (e) { cb.checked = !cb.checked; notify(e.message); }
     cb.disabled = false;
+  });
+  const onlineCb = h("input", { type: "checkbox" }); onlineCb.checked = p.show_online !== false;
+  onlineCb.addEventListener("change", async () => {
+    onlineCb.disabled = true;
+    try { await api("cloudUpdateProfile", { show_online: onlineCb.checked }); notify(onlineCb.checked ? "Tus amigos ya ven cuándo estás en línea." : "Tu estado en línea ya no es visible."); }
+    catch (e) { onlineCb.checked = !onlineCb.checked; notify(e.message); }
+    onlineCb.disabled = false;
   });
   const fileInput = h("input", { type: "file", accept: "image/*", hidden: "" });
   fileInput.addEventListener("change", async () => {
@@ -1557,78 +1558,13 @@ function uploadSummary(r, where) {
   if (r.errors && r.errors.length) setTimeout(() => notify(r.errors.slice(0, 2).join(" · ") + (r.errors.length > 2 ? ` (y ${r.errors.length - 2} más)` : "")), r.uploaded ? 3400 : 0);
 }
 
-// Vista «Archivos» del aula: pestañas «Archivos privados del aula» y «Archivos NotXunta».
-async function renderFiles(root) {
-  root.append(pageTitle("TUS ARCHIVOS", "Archivos", "Tus archivos privados del aula (con el espacio que te da el aula) y los de tu cuenta NotXunta."));
-  const tabs = h("div", { class: "cloud-tabs files-tabs" }), body = h("div", {});
-  root.append(tabs, body);
-  const draw = () => {
-    const tab = state.filesTab || "aula";
-    clear(tabs);
-    for (const [key, label] of [["aula", `Privados del aula · ${state.account ? state.account.name : ""}`], ["nx", "Archivos NotXunta"]])
-      tabs.append(h("button", { type: "button", class: tab === key ? "on" : "", text: label, onclick: () => { state.filesTab = key; draw(); } }));
-    clear(body);
-    const p = tab === "aula" ? moodleFilesPanel(body, "") : nxFilesPanel(body);
-    p.catch(e => { clear(body); body.append(empty("!", "No se pudo cargar", e.message)); });
-  };
-  draw();
-}
-
-// Pantalla «Archivos NotXunta» del lanzador (no depende de ningún aula).
+// Pantalla «Archivos NotXunta» (la misma en el lanzador y dentro de cada aula; no depende de ningún aula).
 async function renderNxFiles(root) {
   clear(root);
   root.append(pageTitle("TU CUENTA", "Archivos NotXunta", "Archivos privados guardados en tu cuenta NotXunta: los ves desde cualquier ordenador."));
   const body = h("div", {});
   root.append(body);
   await nxFilesPanel(body);
-}
-
-async function moodleFilesPanel(root, dir) {
-  clear(root);
-  root.append(h("div", { class: "muted pad", text: "Cargando los archivos privados del aula…" }));
-  let r;
-  try { r = await api("filesMoodleList", state.accountId, dir); }
-  catch (e) { clear(root); root.append(empty("!", "No se pudieron cargar tus archivos privados", e.message)); return; }
-  clear(root);
-  const reload = () => moodleFilesPanel(root, dir).catch(e => notify(e.message));
-  root.append(quotaBar(r.info.used, r.info.quota, "de tu espacio en el aula"));
-  if (r.info.maxUpload) root.append(h("p", { class: "muted files-note", text: `Tamaño máximo por archivo en esta aula: ${fmtBytes(r.info.maxUpload)}.` }));
-
-  const crumbs = h("div", { class: "files-crumbs" }, h("button", { class: "secondary small", text: "Privados", onclick: () => moodleFilesPanel(root, "") }));
-  const parts = dir.split("/").filter(Boolean);
-  parts.forEach((part, i) => crumbs.append(h("span", { class: "muted", text: "›" }),
-    h("button", { class: "secondary small", text: part, onclick: () => moodleFilesPanel(root, "/" + parts.slice(0, i + 1).join("/") + "/") })));
-  root.append(h("div", { class: "files-toolbar" }, crumbs, h("div", { class: "acts" },
-    !dir && fileBtn("＋ Subir archivos", "primary", async () => {
-      const res = await api("filesMoodleUpload", state.accountId);
-      if (res.canceled) return;
-      showLoading("Actualizando…");
-      try { uploadSummary(res, "tus archivos privados del aula"); await reload(); } finally { hideLoading(); }
-    }),
-    h("button", { class: "secondary small", text: "⟳ Actualizar", onclick: reload }))));
-
-  if (!r.items.length) { root.append(empty("❐", dir ? "Carpeta vacía" : "No tienes archivos privados en el aula", dir ? "" : "Sube archivos aquí y también los verás en el aula (Área personal → Archivos privados).")); return; }
-  const list = h("div", { class: "item-list" });
-  for (const f of r.items) {
-    if (f.isdir) {
-      list.append(h("div", { class: "friend-row file-row", style: "cursor:pointer", onclick: () => moodleFilesPanel(root, f.filepath) },
-        h("div", { class: "file-ico dir", text: "▸" }), h("span", { class: "item-main" }, h("b", { text: f.name }), h("span", { class: "muted", text: "Carpeta" }))));
-      continue;
-    }
-    list.append(fileRow(f.name, [fmtBytes(f.size), f.time ? fmtDate(f.time) : ""].filter(Boolean).join(" · "),
-      fileBtn("Abrir", "primary", async () => {
-        showLoading("Abriendo el archivo…");
-        try { const res = await api("openFile", state.accountId, f.url, f.name, f.time); if (res.note) notify(res.note); }
-        finally { hideLoading(); }
-      }),
-      fileBtn("Eliminar", "secondary", async () => {
-        if (!confirm(`¿Eliminar «${f.name}» de tus archivos privados del aula? También desaparecerá de la web del aula.`)) throw new Error("Cancelado.");
-        showLoading("Eliminando…");
-        try { await api("filesMoodleDelete", state.accountId, f.filepath, f.name); notify("Archivo eliminado."); await reload(); }
-        finally { hideLoading(); }
-      })));
-  }
-  root.append(list);
 }
 
 async function nxFilesPanel(root) {

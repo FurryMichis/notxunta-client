@@ -703,60 +703,7 @@ handle("instance:prefetch", (_e, id, files) => {
   return true;
 });
 
-// ---- archivos: privados del aula (con su límite de espacio) y «Archivos NotXunta» (en tu cuenta)
-const fmtMb = n => `${(n / 1048576).toFixed(n < 10485760 ? 1 : 0)} MB`;
-const cleanDir = d => (typeof d === "string" && d.length < 400 && !d.includes("..") && /^[^\x00-\x1f]*$/.test(d) ? d : "");
-
-handle("files:moodleList", async (_e, id, dir) => {
-  try {
-    return await withClient(id, async c => {
-      const d = cleanDir(dir);
-      const info = await c.privateInfo();
-      const items = await c.privateFiles(info.userid, d);
-      items.sort((a, b) => (b.isdir - a.isdir) || a.name.localeCompare(b.name, "es"));
-      return { info, items, dir: d };
-    });
-  } catch (e) { // función desactivada o sin permiso en el aula: se explica en lugar de mostrar el código de Moodle
-    if (e && e.errorcode && !["nopassword", "invalidlogin"].includes(e.errorcode))
-      throw new Error(`El aula no permite consultar tus archivos privados desde aplicaciones externas (${String(e.message).slice(0, 120)}).`);
-    throw e;
-  }
-});
-
-handle("files:moodleUpload", async (_e, id) => {
-  const r = await dialog.showOpenDialog(mainWindow, { title: "Elige archivos para subir a tus archivos privados del aula", properties: ["openFile", "multiSelections"] });
-  if (r.canceled || !r.filePaths.length) return { uploaded: 0, errors: [], canceled: true };
-  return withClient(id, async c => {
-    const info = await c.privateInfo();
-    let used = info.used;
-    const out = { uploaded: 0, errors: [] };
-    for (const file of r.filePaths.slice(0, 20)) {
-      const name = path.basename(file);
-      try {
-        const st = await fs.promises.stat(file);
-        if (!st.isFile()) throw new Error("no es un archivo");
-        if (st.size === 0) throw new Error("está vacío");
-        if (info.maxUpload && st.size > info.maxUpload) throw new Error(`supera el máximo por archivo del aula (${fmtMb(info.maxUpload)})`);
-        if (info.quota && used + st.size > info.quota) throw new Error(`no cabe en tu espacio del aula (te quedan ${fmtMb(Math.max(0, info.quota - used))})`);
-        await c.uploadPrivate(await fs.openAsBlob(file), name);
-        used += st.size; out.uploaded++;
-      } catch (e) { out.errors.push(`${name}: ${e.message}`); }
-    }
-    return out;
-  });
-});
-
-handle("files:moodleDelete", (_e, id, filepath, filename) => withClient(id, async c => {
-  filepath = cleanDir(filepath) || "/"; filename = String(filename || "");
-  if (!filename || filename.length > 255) throw new Error("Archivo no válido.");
-  await c.deletePrivate(filepath, filename);
-  const info = await c.privateInfo(); // se comprueba que de verdad ha desaparecido
-  const left = await c.privateFiles(info.userid, filepath === "/" ? "" : filepath);
-  if (left.some(f => !f.isdir && f.name === filename))
-    throw new Error("El aula no ha permitido borrarlo desde la app. Bórralo desde la web del aula (Área personal → Archivos privados).");
-  return true;
-}));
-
+// ---- «Archivos NotXunta» (archivos privados guardados en tu cuenta)
 handle("nx:list", () => nxfiles.overview());
 handle("nx:upload", async () => {
   const r = await dialog.showOpenDialog(mainWindow, { title: "Elige archivos para subir a tus Archivos NotXunta", properties: ["openFile", "multiSelections"] });

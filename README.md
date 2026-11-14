@@ -1,4 +1,4 @@
-# NotXunta Client 0.6.1
+# NotXunta Client 0.6.2
 
 Cliente de escritorio para el Aula Virtual (Moodle) de la Xunta de Galicia. **Para Windows, Linux y macOS.**
 
@@ -48,9 +48,13 @@ Para probar sin compilar: `npm start`.
 - Google puede pedir verificación extra al iniciar sesión dentro del overlay; el botón ↗ abre la página en tu navegador.
 - Las tareas se abren en el navegador para entregarlas (no se suben archivos desde la app).
 
+## Novedades de la 0.6.2 — arreglos
+- **Arreglado**: la pestaña «Cuenta y amigos» salía vacía (solo el título) y «Apariencia» no se abría. Causa: el interruptor «Mostrar cuando estoy en línea» (0.6.1) estaba definido en la función equivocada, así que al dibujar la pantalla saltaba un error. Además, si una parte de «Cuenta y amigos» falla, ahora se muestra el motivo en vez de dejar la pantalla en blanco.
+- **Quitados los archivos privados del aula virtual** (Área personal → Archivos privados de Moodle). «Archivos» ahora es solo **Archivos NotXunta** (tu cuenta, Supabase Storage). No hace falta ejecutar ningún SQL nuevo: sigue valiendo `supabase/migration-0.6.1.sql`.
+
 ## Novedades de la 0.6.1 — amigos en línea y archivos
 - **Estado «en línea» entre amigos**: en «Amigos» aparece un punto verde junto a quien tiene la app abierta (o «Visto hace 5 min»). Solo lo ven los amigos aceptados. Se desactiva en «Cuenta y amigos» → «Mostrar cuando estoy en línea». La app avisa cada 45 s; si se cierra o se apaga el PC, el punto desaparece en unos 2 minutos.
-- **Archivos privados del aula** (sección «Archivos» dentro del aula): lista (con carpetas), abrir, subir y eliminar los archivos de *Área personal → Archivos privados* de Moodle, con la barra de espacio usado y el límite del aula (`userquota`) y el máximo por archivo. Antes de subir se comprueba que cabe.
+- ~~**Archivos privados del aula**~~ _(quitado en la 0.6.2)_ (sección «Archivos» dentro del aula): lista (con carpetas), abrir, subir y eliminar los archivos de *Área personal → Archivos privados* de Moodle, con la barra de espacio usado y el límite del aula (`userquota`) y el máximo por archivo. Antes de subir se comprueba que cabe.
   - Depende de lo que permita cada aula: si tiene desactivado el acceso a archivos privados desde aplicaciones externas, la app lo explica. Borrar necesita una función de Moodle que no todas las aulas ofrecen; si no se puede, la app lo avisa y hay que borrar desde la web. **No se ha podido probar contra el Aula Virtual real de la Xunta**: pruébalo con un archivo de prueba.
 - **Archivos NotXunta** (también en el menú del lanzador): archivos privados guardados en tu cuenta (Supabase Storage). Se ven desde cualquier ordenador; subir, abrir, «Guardar como…» y eliminar. Límites por defecto: 100 MB por cuenta y 25 MB por archivo (se cambian en `supabase/migration-0.6.1.sql`: `nx_quota()` y `nx_max_file()`; y el límite por archivo del bucket, una línea más abajo).
 - **Actualiza el servidor antes de publicar**: ejecuta `supabase/migration-0.6.1.sql` en Supabase → SQL Editor (crea el estado en línea, el bucket privado `nx-files` y sus reglas). Sin esto la app sigue funcionando, pero esas dos funciones avisarán de que falta.
